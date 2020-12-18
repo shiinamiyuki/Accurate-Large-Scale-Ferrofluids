@@ -10,16 +10,16 @@ int main() {
     {
         std::random_device rd;
         std::uniform_real_distribution<float> dist;
-        // for (float x = 0.0; x < 1.0; x += 0.09) {
-        //     for (float z = 0.0; z < 1.0; z += 0.09) {
-        //         for (float y = 0.0; y < 0.20; y += 0.09) {
-        //             particles.emplace_back(x, y, z);
-        //         }
-        //     }
-        // }
-        for(int i= 0;i < 4000;i++){
-            particles.emplace_back(dist(rd), dist(rd), dist(rd));
+        for (float x = 0.3; x < 0.6; x += 0.02) {
+            for (float z = 0.3; z < 0.6; z += 0.02) {
+                for (float y = 0.03; y < 0.2; y += 0.02) {
+                    particles.emplace_back(x, y, z);
+                }
+            }
         }
+        // for(int i= 0;i < 4000;i++){
+        //     particles.emplace_back(dist(rd), dist(rd), dist(rd));
+        // }
     }
     Simulation sim(particles);
     bool flag = true;

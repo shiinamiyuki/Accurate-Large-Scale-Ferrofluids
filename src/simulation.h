@@ -105,10 +105,12 @@ class Simulation {
     void find_neighbors();
     vec3 dvdt_momentum_term(size_t id);
     vec3 dvdt_viscosity_term(size_t id);
+    vec3 dvdt_full(size_t id);
     float drhodt(size_t id);
     void naive_collison_handling();
     float P(size_t id);
-
+    void run_step_euler();
+    void run_step_adami();
   public:
     Buffers buffers;
     Pointers pointers;
