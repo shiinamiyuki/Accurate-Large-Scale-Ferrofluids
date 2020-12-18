@@ -27,7 +27,11 @@ static inline double dW(double r, double h) {
     return res;
 }
 
-static inline vec3 gradW(vec3 r, double h) { return (float)dW(length(r), h) * r / length(r); }
+static inline vec3 gradW(vec3 r, float h) {
+    if (dot(r, r) == 0.0)
+        return vec3(0.0);
+    return (float)dW(length(r), h) * normalize(r);
+}
 
 void Simulation::init() {
     grid_size = floor(vec3(1) / vec3(2.0 * dh));
@@ -48,9 +52,10 @@ void Simulation::init() {
     pointers.grid = buffers.grid.get();
     pointers.neighbors = buffers.neighbors.get();
     pointers.P = buffers.P.get();
-    mass = pi * radius * radius;
+    mass = radius * radius * radius * rho0;
     tbb::parallel_for((size_t)0, num_particles, [=](size_t i) {
         pointers.density[i] = rho0;
+        pointers.particle_velocity[i] = vec3(0);
         pointers.P[i] = P(i);
     });
 }
@@ -96,7 +101,8 @@ void Simulation::find_neighbors() {
     });
 }
 vec3 Simulation::dvdt_momentum_term(size_t id) {
-    const vec3 gravity(0.0, -0.98, 0.0);
+    const vec3 gravity(0.0, -0.0098, 0.0);
+    CHECK(mass != 0.0);
     vec3 dvdt(0.0);
     auto ra = pointers.particle_position[id];
     auto &neighbors = pointers.neighbors[id];
@@ -107,13 +113,15 @@ vec3 Simulation::dvdt_momentum_term(size_t id) {
         auto rb = pointers.particle_position[b];
         auto Pb = pointers.P[b];
         auto rho_b = pointers.density[b];
-        dvdt += mass * (Pa / (rho_a * rho_a) + Pb / (rho_b * rho_b)) * gradW(ra - rb, dh);
+        CHECK(rho_a != 0.0);
+        dvdt += -mass * (Pa / (rho_a * rho_a) + Pb / (rho_b * rho_b)) * gradW(ra - rb, dh);
     }
     dvdt += gravity;
+    CHECK(!glm::any(glm::isnan(dvdt)));
     return dvdt;
 }
 vec3 Simulation::dvdt_viscosity_term(size_t id) {
-    constexpr float eps = 0.01;
+    constexpr float eps = 0.01f;
     vec3 dvdt(0.0);
     auto ra = pointers.particle_position[id];
     auto va = pointers.particle_velocity[id];
@@ -124,12 +132,13 @@ vec3 Simulation::dvdt_viscosity_term(size_t id) {
         auto vb = pointers.particle_velocity[b];
         auto vab = va - vb;
         auto rab = ra - rb;
-        if (dot(vab, rab) <= 0.0) {
+        if (dot(vab, rab) < 0.0) {
             auto v = -2 * alpha * dh * c0 / (pointers.density[id] + pointers.density[b]);
             auto pi_ab = -v * dot(vab, rab) / (dot(rab, rab) + eps * dh * dh);
-            dvdt += -mass * pi_ab * gradW(rab, dh);
+            dvdt += mass * pi_ab * gradW(rab, dh); // minus?
         }
     }
+    CHECK(!glm::any(glm::isnan(dvdt)));
     return dvdt;
 }
 float Simulation::drhodt(size_t id) {
@@ -145,13 +154,14 @@ float Simulation::drhodt(size_t id) {
         auto rab = ra - rb;
         drhodt += mass * dot(vab, gradW(rab, dh));
     }
+    CHECK(!std::isnan(drhodt));
     return drhodt;
 }
 void Simulation::naive_collison_handling() {
     tbb::parallel_for(size_t(0), num_particles, [=](size_t id) {
         auto &p = pointers.particle_position[id];
         auto &v = pointers.particle_velocity[id];
-        auto k = 0.5;
+        auto k = 0.1;
         for (int i = 0; i < 3; i++) {
             if (p[i] < 0.0) {
                 p[i] = 0.0;
@@ -161,7 +171,7 @@ void Simulation::naive_collison_handling() {
             }
             if (p[i] > 1.0) {
                 p[i] = 1.0;
-                if (v[i] > 1.0) {
+                if (v[i] > 0.0) {
                     v[i] += -(1 + k) * v[i];
                 }
             }

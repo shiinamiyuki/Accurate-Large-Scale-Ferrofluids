@@ -10,9 +10,15 @@ int main() {
     {
         std::random_device rd;
         std::uniform_real_distribution<float> dist;
-        for (int i = 0; i < 300; i++) {
-            auto p = vec3(dist(rd), dist(rd), dist(rd));
-            particles.emplace_back(p);
+        // for (float x = 0.0; x < 1.0; x += 0.09) {
+        //     for (float z = 0.0; z < 1.0; z += 0.09) {
+        //         for (float y = 0.0; y < 0.20; y += 0.09) {
+        //             particles.emplace_back(x, y, z);
+        //         }
+        //     }
+        // }
+        for(int i= 0;i < 4000;i++){
+            particles.emplace_back(dist(rd), dist(rd), dist(rd));
         }
     }
     Simulation sim(particles);
@@ -28,6 +34,7 @@ int main() {
             P.resize(sim.buffers.num_particles, 3);
             for (size_t i = 0; i < sim.buffers.num_particles; i++) {
                 auto p = sim.buffers.particle_position[i];
+                // printf("%f %f %f\n", p.x, p.y, p.z);
                 P.row(i) = Eigen::RowVector3d(p.x, p.y, p.z);
             }
             lk.unlock();
@@ -39,6 +46,7 @@ int main() {
     viewer.callback_post_draw = [&](Viewer &) -> bool {
         std::unique_lock<std::mutex> lk(m);
         if (std::cv_status::no_timeout == cv.wait_for(lk, std::chrono::milliseconds(16))) {
+            viewer.data().point_size = 5;
             viewer.data().set_points(P, Eigen::RowVector3d(1, 1, 1));
         }
         return false;

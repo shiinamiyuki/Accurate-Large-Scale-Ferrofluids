@@ -35,7 +35,12 @@ using glm::vec3;
 //     }
 //     return p;
 // }
-
+#define CHECK(expr)                                                                                                    \
+    [&] {                                                                                                              \
+        if (!(expr)) {                                                                                                 \
+            fprintf(stderr, #expr " failed at %s:%d\n", __FILE__, __LINE__);                                           \
+        }                                                                                                              \
+    }()
 class Simulation {
 
     struct Cell {
@@ -74,14 +79,14 @@ class Simulation {
         Neighbors *neighbors = nullptr;
     };
     void init();
-    float radius = 0.02;
-    float dh = radius * 1.3;
+    float radius = 0.02f;
+    float dh = radius * 1.3f;
     float c0 = 20;
     float rho0 = 1000;
     float gamma = 7;
     float kappa = 1.0;
-    float alpha = 1.0;
-    float dt = 0.001;
+    float alpha = 0.5;
+    float dt = 0.0001;
     int size = 0;
     float mass = 0.0;
     ivec3 grid_size;
@@ -103,6 +108,7 @@ class Simulation {
     float drhodt(size_t id);
     void naive_collison_handling();
     float P(size_t id);
+
   public:
     Buffers buffers;
     Pointers pointers;
