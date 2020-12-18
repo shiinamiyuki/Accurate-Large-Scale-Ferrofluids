@@ -89,9 +89,9 @@ class Simulation {
     float dt = 0.0001;
     int size = 0;
     float mass = 0.0;
-    float h = 2 * radius; //kernel size
+    float h = 2 * radius;       // kernel size
     float susceptibility = 0.8; // material susceptibility
-    float Gamma = pow(0.02, 3) * (susceptibility/(1 + susceptibility))
+    float Gamma = pow(0.02, 3) * (susceptibility / (1 + susceptibility));
     ivec3 grid_size;
     uint32_t get_index_i(const ivec3 &p) const { return p.x + p.y * grid_size.x + p.z * grid_size.x * grid_size.y; }
     ivec3 get_cell(const vec3 &p) const {
@@ -120,6 +120,7 @@ class Simulation {
 
     void run_step_euler();
     void run_step_adami();
+
   public:
     Buffers buffers;
     Pointers pointers;

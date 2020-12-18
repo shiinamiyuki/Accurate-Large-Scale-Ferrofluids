@@ -213,25 +213,15 @@ void Simulation::run_step_euler() {
     // printf("step done\n");
 }
 
-float Simulation::W_avr(size_t id){
+float Simulation::W_avr(size_t id) { return 0.0; }
 
-}
+float Simulation::W(size_t id) { return 0.0; }
 
-float Simulation::W(size_t id){
+void Simulation::eval_Hext() {}
 
-}
+void Simulation::magnetization() {}
 
-void Simulation::eval_Hext(){
-
-}
-
-void Simulation::magnetization(){
-
-}
-
-void Simulation::compute_magenetic_force(){
-
-}
+void Simulation::compute_magenetic_force() {}
 void Simulation::run_step_adami() {
     build_grid();
     find_neighbors();
