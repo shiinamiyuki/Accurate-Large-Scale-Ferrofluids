@@ -141,6 +141,13 @@ vec3 Simulation::dvdt_viscosity_term(size_t id) {
     CHECK(!glm::any(glm::isnan(dvdt)));
     return dvdt;
 }
+vec3 Simulation::dvdt_full(size_t id) {
+    vec3 dvdt = vec3(0.0);
+    dvdt += dvdt_momentum_term(id);
+    dvdt += dvdt_viscosity_term(id);
+    return dvdt;
+}
+
 float Simulation::drhodt(size_t id) {
     float drhodt = 0.0;
     auto ra = pointers.particle_position[id];
@@ -182,15 +189,19 @@ float Simulation::P(size_t id) {
     auto B = rho0 * c0 * c0 / gamma;
     return B * (std::pow(pointers.density[id] / rho0, gamma) - 1.0);
 }
-void Simulation::run_step() {
+void Simulation::run_step_euler() {
     build_grid();
     find_neighbors();
     tbb::parallel_for(size_t(0), num_particles, [=](size_t id) {
-        vec3 dvdt = vec3(0.0);
-        dvdt += dvdt_momentum_term(id);
-        dvdt += dvdt_viscosity_term(id);
+        vec3 dvdt = dvdt_full(id);
         pointers.drhodt[id] = drhodt(id);
         pointers.dvdt[id] = dvdt;
+    });
+    tbb::parallel_for(size_t(0), num_particles, [=](size_t id) {
+        pointers.particle_position[id] += dt * 0.5f * pointers.particle_velocity[id];
+        pointers.particle_velocity[id] += dt * 0.5f * pointers.dvdt[id];
+        pointers.density[id] += dt * pointers.drhodt[id];
+        pointers.P[id] = P(id);
     });
     tbb::parallel_for(size_t(0), num_particles, [=](size_t id) {
         pointers.particle_position[id] += dt * pointers.particle_velocity[id];
@@ -221,3 +232,32 @@ void Simulation::magnetization(){
 void Simulation::compute_magenetic_force(){
 
 }
+void Simulation::run_step_adami() {
+    build_grid();
+    find_neighbors();
+    tbb::parallel_for(size_t(0), num_particles, [=](size_t id) {
+        vec3 dvdt = dvdt_full(id);
+        pointers.dvdt[id] = dvdt; // v(t + dt/2)
+    });
+    tbb::parallel_for(size_t(0), num_particles, [=](size_t id) {
+        pointers.particle_velocity[id] += dt * 0.5f * pointers.dvdt[id]; // v(t + dt/2)
+        pointers.particle_position[id] +=
+            dt * 0.5f * pointers.particle_velocity[id]; // r(t+dt/2) = r(t) + dt/2 * v(t + dt/2)
+    });
+    tbb::parallel_for(size_t(0), num_particles, [=](size_t id) {
+        pointers.density[id] += dt * drhodt(id); // rho(t+dt) = rho(t) + dt * drhodt(t + dt/2)
+    });
+    tbb::parallel_for(size_t(0), num_particles, [=](size_t id) {
+        pointers.particle_position[id] +=
+            dt * 0.5f * pointers.particle_velocity[id]; // r(t+dt) = r(t+dt/2) + dt/2 * v(t+dt/2)
+        vec3 dvdt = dvdt_full(id);
+        pointers.dvdt[id] = dvdt; // Insert magnetic force here
+    });
+    tbb::parallel_for(size_t(0), num_particles, [=](size_t id) {
+        pointers.particle_velocity[id] += dt * 0.5f * pointers.dvdt[id];
+        pointers.P[id] = P(id);
+    });
+    naive_collison_handling();
+    // printf("step done\n");
+}
+void Simulation::run_step() { run_step_adami(); }
