@@ -201,3 +201,23 @@ void Simulation::run_step() {
     naive_collison_handling();
     // printf("step done\n");
 }
+
+float Simulation::W_avr(size_t id){
+
+}
+
+float Simulation::W(size_t id){
+
+}
+
+void Simulation::eval_Hext(){
+
+}
+
+void Simulation::magnetization(){
+
+}
+
+void Simulation::compute_magenetic_force(){
+
+}
