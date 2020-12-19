@@ -282,6 +282,10 @@ float Simulation::dWdr(vec3 r) {
 void Simulation::eval_Hext() {
     // still need some thinking here
     // single point magnetic field
+    // lets try with (0, 1, 0)
+    for (size_t i = 0; i < num_particles; i++) {
+        pointers.Hext[i] = vec3(0, 1, 0);
+    }
 }
 
 void Simulation::get_R(Eigen::Matrix3d &R, const Eigen::Vector3d &rt, const Eigen::Vector3d &rs) {
