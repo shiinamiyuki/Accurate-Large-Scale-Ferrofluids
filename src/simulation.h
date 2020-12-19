@@ -42,7 +42,7 @@ using glm::vec3;
         }                                                                                                              \
     }()
 class Simulation {
-
+  public:
     struct Cell {
         static constexpr size_t max_particles = 100;
         std::array<uint32_t, max_particles> particles;
@@ -121,7 +121,6 @@ class Simulation {
     void run_step_euler();
     void run_step_adami();
 
-  public:
     Buffers buffers;
     Pointers pointers;
     Simulation(const std::vector<vec3> &particles) : size(size), num_particles(particles.size()) {

@@ -1,7 +1,9 @@
+#include "reconstruction.h"
 #include "simulation.h"
 #include <Eigen/Core>
 #include <chrono>
 #include <igl/opengl/glfw/Viewer.h>
+#include <igl/writeOBJ.h>
 #include <iostream>
 #include <random>
 int main() {
@@ -56,4 +58,18 @@ int main() {
     flag = false;
 
     sim_thd.join();
+
+    {
+        Eigen::VectorXd mass, density;
+        mass.resize(sim.num_particles);
+        density.resize(sim.num_particles);
+        mass.setConstant(sim.mass);
+        for (size_t i = 0; i < sim.num_particles; i++) {
+            density[i] = sim.pointers.density[i];
+        }
+        Eigen::MatrixXd V;
+        Eigen::MatrixXi F;
+        reconstruct(V, F, P, Eigen::Vector3i(50,50,50), mass, density, sim.h);
+        igl::writeOBJ("sim.obj", V, F);
+    }
 }
