@@ -44,6 +44,10 @@ void Simulation::init() {
     buffers.grid.reset(new Cell[grid_size.x * grid_size.y * grid_size.z]);
     buffers.neighbors.reset(new Neighbors[num_particles]);
     buffers.P.reset(new float[num_particles]);
+    buffers.particle_H.reset(new vec3[num_particles]);
+    buffers.particle_M.reset(new vec3[num_particles]);
+    buffers.particle_mag_moment.reset(new vec3[num_particles]);
+    buffers.Hext.reset(new vec3[num_particles]);
     pointers.particle_position = buffers.particle_position.get();
     pointers.particle_velocity = buffers.particle_velocity.get();
     pointers.density = buffers.density.get();
@@ -52,6 +56,10 @@ void Simulation::init() {
     pointers.grid = buffers.grid.get();
     pointers.neighbors = buffers.neighbors.get();
     pointers.P = buffers.P.get();
+    pointers.particle_H = buffers.particle_H.get();
+    pointers.particle_M = buffers.particle_M.get();
+    pointers.particle_mag_moment = buffers.particle_mag_moment.get();
+    pointers.Hext = buffers.Hext.get();
     mass = radius * radius * radius * rho0;
     tbb::parallel_for((size_t)0, num_particles, [=](size_t i) {
         pointers.density[i] = rho0;
@@ -213,13 +221,61 @@ void Simulation::run_step_euler() {
     // printf("step done\n");
 }
 
-float Simulation::W_avr(size_t id) { return 0.0; }
+vec3 Simulation::H(vec3 r, vec3 m){
+    float r_norm = dot(r, r);
+    vec3 r_hat = normalize(r);
+    vec3 H_r = dot(r_hat, m) * (W_avr(r) - W(r)) * r_hat - (W_avr(r)/3.0f) * m;
+    return H_r;
+}
 
-float Simulation::W(size_t id) { return 0.0; }
+float Simulation::W_avr(vec3 r) { 
+    float r_norm = dot(r, r);
+    float W_r_h = 0.0;
+    float q = r_norm/h;
+    if (0 <= q && q < 1){
+        W_r_h = (1.0 / 40.0) * (15.0 * pow(q, 3) - 36 * pow(q, 2) + 40.0);
+    }
+    else if (1 <= q && q < 2){
+        W_r_h = (-3.0/(4.0 * pow(q, 3))) * (pow(q, 6)/6.0 - (6.0 * pow(q, 5))/5.0 + 
+                3.0 * pow(q, 4) - (8.0 * pow(q, 3))/3.0 + 1.0/15.0);
+    }
+    else{
+        W_r_h = 3.0 / (4.0 * pow(q, 3));
+    }
+    W_r_h *= (1.0 / pi);
+    W_r_h *= (1.0 / pow(h, 3));
+    return W_r_h;
+}
 
-void Simulation::eval_Hext() {}
+float Simulation::W(vec3 r) {
+    float r_norm = dot(r, r);
+    float W_r_h = 0.0;
+    float q = r_norm/h;
+    if (0 <= q && q < 1){
+        W_r_h = 0.25 * pow((2.0 - q), 3) - pow((1.0 - q), 3); 
+    }
+    if (1 <= q && q < 2){
+        W_r_h = 0.25 * pow((2.0 - q), 3);
+    }
+    W_r_h *= (1.0 / pi);
+    W_r_h *= (1.0 / pow(h, 3));
+    return W_r_h;
+}
 
-void Simulation::magnetization() {}
+void Simulation::eval_Hext() {
+    // 
+}
+
+void Simulation::magnetization() {
+    for(size_t t = 0; t < num_particles; t++){
+        pointers.particle_H[t] = vec3(0.0f, 0.0f, 0.0f);
+        pointers.particle_M[t] = vec3(0.0f, 0.0f, 0.0f);
+        for(size_t s = 0; s < num_particles; s++){
+            pointers.particle_H[t] += H(pointers.particle_position[t] - pointers.particle_position[s], pointers.particle_mag_moment[s]);
+            pointers.particle_M[t] += pointers.particle_mag_moment[s] * W(pointers.particle_position[t] - pointers.particle_position[s]);
+        }
+    }
+}
 
 void Simulation::compute_magenetic_force() {}
 void Simulation::run_step_adami() {

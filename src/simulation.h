@@ -60,6 +60,10 @@ class Simulation {
         // SOA for max locality
         std::unique_ptr<vec3[]> particle_position;
         std::unique_ptr<vec3[]> particle_velocity;
+        std::unique_ptr<vec3[]> particle_H;
+        std::unique_ptr<vec3[]> particle_M;
+        std::unique_ptr<vec3[]> particle_mag_moment;
+        std::unique_ptr<vec3[]> Hext;
         std::unique_ptr<float[]> density;
         std::unique_ptr<vec3[]> dvdt;
         std::unique_ptr<float[]> drhodt;
@@ -71,6 +75,10 @@ class Simulation {
     struct Pointers {
         vec3 *particle_position = nullptr;
         vec3 *particle_velocity = nullptr;
+        vec3 *particle_H = nullptr;
+        vec3 *particle_M = nullptr;
+        vec3 *particle_mag_moment = nullptr;
+        vec3 *Hext = nullptr;
         float *density = nullptr;
         vec3 *dvdt = nullptr;
         float *drhodt = nullptr;
@@ -112,8 +120,9 @@ class Simulation {
     float drhodt(size_t id);
     void naive_collison_handling();
     float P(size_t id);
-    float Simulation::W_avr(size_t id);
-    float Simulation::W(size_t id);
+    vec3 H(vec3 r, vec3 m);
+    float W_avr(vec3 r);
+    float W(vec3 r);
     void eval_Hext();
     void magnetization();
     void compute_magenetic_force();
