@@ -12,9 +12,9 @@ int main() {
     {
         std::random_device rd;
         std::uniform_real_distribution<float> dist;
-        for (float x = 0.0; x < 1.0; x += 0.05) {
-            for (float z = 0.0; z < 1.0; z += 0.05) {
-                for (float y = 0.0; y < 0.13; y += 0.04) {
+        for (float x = 0.01; x < 0.97; x += 0.05) {
+            for (float z = 0.01; z < 0.97; z += 0.05) {
+                for (float y = 0.0; y < 0.13; y += 0.02) {
                     particles.emplace_back(x, y, z);
                 }
             }

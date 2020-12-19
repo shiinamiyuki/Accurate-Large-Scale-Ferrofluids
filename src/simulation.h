@@ -13,11 +13,11 @@
 #include <memory>
 #include <vector>
 
+using glm::dvec3;
 using glm::ivec2;
 using glm::ivec3;
 using glm::vec2;
 using glm::vec3;
- using glm::dvec3;
 // template <typename T, typename... Args>
 // T *cuda_new(Args... args)
 // {
@@ -107,6 +107,7 @@ class Simulation {
     float susceptibility = 0.8; // material susceptibility
     float Gamma = pow(radius, 3) * (susceptibility / (1 + susceptibility));
     ivec3 grid_size;
+    dvec3 dipole = dvec3(0.5, -0.2, 0.5);
     uint32_t get_index_i(const ivec3 &p) const { return p.x + p.y * grid_size.x + p.z * grid_size.x * grid_size.y; }
     ivec3 get_cell(const vec3 &p) const {
         ivec3 ip = p * vec3(grid_size);
@@ -123,6 +124,7 @@ class Simulation {
     void find_neighbors();
     vec3 dvdt_momentum_term(size_t id);
     vec3 dvdt_viscosity_term(size_t id);
+    vec3 dvdt_tension_term(size_t id);
     vec3 dvdt_full(size_t id);
     float drhodt(size_t id);
     void naive_collison_handling();

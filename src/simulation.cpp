@@ -153,10 +153,31 @@ vec3 Simulation::dvdt_viscosity_term(size_t id) {
     CHECK(!glm::any(glm::isnan(dvdt)));
     return dvdt;
 }
+vec3 Simulation::dvdt_tension_term(size_t id) {
+    constexpr float eps = 0.01f;
+    vec3 f(0.0);
+    auto ra = pointers.particle_position[id];
+    auto va = pointers.particle_velocity[id];
+    auto &neighbors = pointers.neighbors[id];
+    const auto k = 1.0f;
+    for (size_t i = 0; i < neighbors.n_neighbors; i++) {
+        auto b = neighbors.neighbors[i];
+        auto rb = pointers.particle_position[b];
+        auto vb = pointers.particle_velocity[b];
+        auto vab = va - vb;
+        auto rab = ra - rb;
+        if (length(rab) <= k * h) {
+            f += 100.0f * mass * mass * float(std::cos(3 * pi / (2 * k * h) * length(rab))) * rab;
+        }
+    }
+    CHECK(!glm::any(glm::isnan(f)));
+    return f / mass;
+}
 vec3 Simulation::dvdt_full(size_t id) {
     vec3 dvdt = vec3(0.0);
     dvdt += dvdt_momentum_term(id);
     dvdt += dvdt_viscosity_term(id);
+    dvdt += dvdt_tension_term(id);
     return dvdt;
 }
 
@@ -296,8 +317,8 @@ void Simulation::eval_Hext() {
     //     pointers.Hext[i] = vec3(0, 1, 0);
     // }
     const double mu0 = 1.25663706212e-16;
-    dvec3 m(0, 1, 0);
-    dvec3 dipole(0.5, -0.1, 0.5);
+    dvec3 m(0, 4, 0);
+
     for (size_t i = 0; i < num_particles; i++) {
         dvec3 p = pointers.particle_position[i];
         dvec3 r = p - dipole;
@@ -412,17 +433,22 @@ void Simulation::compute_magenetic_force() {
     for (size_t i = 0; i < num_particles; i++) {
         hext.segment<3>(3 * i) << pointers.Hext[i][0], pointers.Hext[i][1], pointers.Hext[i][2];
     }
-    magnetization();
+
     Eigen::SparseMatrix<double> G;
     G.resize(3 * num_particles, 3 * num_particles);
     std::vector<Eigen::Triplet<double>> trip;
     for (size_t j = 0; j < num_particles; j++) {
+        dvec3 r(pointers.particle_position[j][0], pointers.particle_position[j][1], pointers.particle_position[j][2]);
+        r -= dipole;
         // trip.push_back(Eigen::Triplet<double>(3 * j, 3 * j, pointers.particle_position[j][0]));
         // trip.push_back(Eigen::Triplet<double>(3 * j + 1, 3 * j + 1, pointers.particle_position[j][1]));
         // trip.push_back(Eigen::Triplet<double>(3 * j + 2, 3 * j + 2, pointers.particle_position[j][2]));
         for (int k = 0; k < 3; k++) {
-            trip.emplace_back(3 * k, 3 * k, pointers.particle_H[j][k] + pointers.particle_M[j][k]);
+            trip.emplace_back(3 * k, 3 * k, r[k]);
         }
+        // for (int k = 0; k < 3; k++) {
+        //     trip.emplace_back(3 * k, 3 * k, pointers.particle_H[j][k] + pointers.particle_M[j][k]);
+        // }
     }
 
     G.setFromTriplets(trip.begin(), trip.end());
@@ -435,6 +461,7 @@ void Simulation::compute_magenetic_force() {
     b = cg.solve(-1.0 * hext);
     // b = cg.solve(-1.0 * hext);
     compute_m(b);
+    magnetization();
     Eigen::Vector3d m_hat, ft;
     Eigen::Matrix3d R, Ts, T_hat;
     float q;
@@ -472,12 +499,14 @@ void Simulation::compute_magenetic_force() {
 void Simulation::run_step_adami() {
     if (n_iter == 0) {
         eval_Hext();
+        tbb::parallel_for(size_t(0), num_particles, [=](size_t id) { pointers.particle_mag_force[id] = vec3(0); });
     }
     build_grid();
     find_neighbors();
     tbb::parallel_for(size_t(0), num_particles, [=](size_t id) {
         vec3 dvdt = dvdt_full(id);
-        pointers.dvdt[id] = dvdt; // v(t + dt/2)
+        vec3 f = pointers.particle_mag_force[id];
+        pointers.dvdt[id] = dvdt + f / mass; // v(t + dt/2)
     });
     tbb::parallel_for(size_t(0), num_particles, [=](size_t id) {
         pointers.particle_velocity[id] += dt * 0.5f * pointers.dvdt[id]; // v(t + dt/2)
