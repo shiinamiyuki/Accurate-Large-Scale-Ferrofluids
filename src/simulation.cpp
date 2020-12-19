@@ -1,5 +1,7 @@
 #include "simulation.h"
 #include <tbb/parallel_for.h>
+#include <Eigen/Core>
+#include <Eigen/Sparse>
 constexpr double pi = 3.1415926535897;
 // https://github.com/erizmr/SPH_Taichi
 static inline double W(double r, double h) {
@@ -44,6 +46,11 @@ void Simulation::init() {
     buffers.grid.reset(new Cell[grid_size.x * grid_size.y * grid_size.z]);
     buffers.neighbors.reset(new Neighbors[num_particles]);
     buffers.P.reset(new float[num_particles]);
+    buffers.particle_H.reset(new vec3[num_particles]);
+    buffers.particle_M.reset(new vec3[num_particles]);
+    buffers.particle_mag_moment.reset(new vec3[num_particles]);
+    buffers.particle_mag_force.reset(new vec3[num_particles]);
+    buffers.Hext.reset(new vec3[num_particles]);
     pointers.particle_position = buffers.particle_position.get();
     pointers.particle_velocity = buffers.particle_velocity.get();
     pointers.density = buffers.density.get();
@@ -52,6 +59,11 @@ void Simulation::init() {
     pointers.grid = buffers.grid.get();
     pointers.neighbors = buffers.neighbors.get();
     pointers.P = buffers.P.get();
+    pointers.particle_H = buffers.particle_H.get();
+    pointers.particle_M = buffers.particle_M.get();
+    pointers.particle_mag_moment = buffers.particle_mag_moment.get();
+    pointers.Hext = buffers.Hext.get();
+    pointers.particle_mag_force = buffers.particle_mag_force.get();
     mass = radius * radius * radius * rho0;
     tbb::parallel_for((size_t)0, num_particles, [=](size_t i) {
         pointers.density[i] = rho0;
@@ -213,15 +225,157 @@ void Simulation::run_step_euler() {
     // printf("step done\n");
 }
 
-float Simulation::W_avr(size_t id) { return 0.0; }
+vec3 Simulation::H(vec3 r, vec3 m){
+    float r_norm = dot(r, r);
+    vec3 r_hat = normalize(r);
+    vec3 H_r = dot(r_hat, m) * (W_avr(r) - W(r)) * r_hat - (W_avr(r)/3.0f) * m;
+    return H_r;
+}
 
-float Simulation::W(size_t id) { return 0.0; }
+float Simulation::W_avr(vec3 r) { 
+    float r_norm = dot(r, r);
+    float W_r_h = 0.0;
+    float q = r_norm/h;
+    if (0 <= q && q < 1){
+        W_r_h = (1.0 / 40.0) * (15.0 * pow(q, 3) - 36 * pow(q, 2) + 40.0);
+    }
+    else if (1 <= q && q < 2){
+        W_r_h = (-3.0/(4.0 * pow(q, 3))) * (pow(q, 6)/6.0 - (6.0 * pow(q, 5))/5.0 + 
+                3.0 * pow(q, 4) - (8.0 * pow(q, 3))/3.0 + 1.0/15.0);
+    }
+    else{
+        W_r_h = 3.0 / (4.0 * pow(q, 3));
+    }
+    W_r_h *= (1.0 / pi);
+    W_r_h *= (1.0 / pow(h, 3));
+    return W_r_h;
+}
 
-void Simulation::eval_Hext() {}
+float Simulation::W(vec3 r) {
+    float r_norm = dot(r, r);
+    float W_r_h = 0.0;
+    float q = r_norm/h;
+    if (0 <= q && q < 1){
+        W_r_h = 0.25 * pow((2.0 - q), 3) - pow((1.0 - q), 3); 
+    }
+    if (1 <= q && q < 2){
+        W_r_h = 0.25 * pow((2.0 - q), 3);
+    }
+    W_r_h *= (1.0 / pi);
+    W_r_h *= (1.0 / pow(h, 3));
+    return W_r_h;
+}
 
-void Simulation::magnetization() {}
+float Simulation::dWdr(vec3 r) {
+    float r_norm = dot(r, r);
+    float dW_r_h = 0.0;
+    float q = r_norm/h;
+    if (0 <= q && q < 1){
+        dW_r_h = 2.25 * pow(q, 2) - 3.0 * q;
+    }
+    if (1 <= q && q < 2){
+        dW_r_h = -0.75 * pow(q, 2) + 3.0 * q - 3.0;
+    }
+    dW_r_h *= (1.0 / pi);
+    dW_r_h *= (1.0 / pow(h, 3));
+    return dW_r_h;
+}
 
-void Simulation::compute_magenetic_force() {}
+void Simulation::eval_Hext() {
+    // still need some thinking here
+    // single point magnetic field
+}
+
+void Simulation::get_R(Eigen::Matrix3d R, const Eigen::Vector3d rt, const Eigen::Vector3d rs){
+    // given rt and rs world coordinate, transform it to the coordinate where rs is on origin
+    // let (zeta, eta, xi) be the unit vectors and assume rt is on its 
+}
+
+void Simulation::get_T_hat(Eigen::Matrix3d T_hat, const Eigen::Vector3d ms){
+    // have no idea wtf is c here, need to read the paper more times.
+}
+
+void Simulation::get_Force_Tensor(Eigen::Matrix3d Ts, const Eigen::Vector3d rt, const Eigen::Vector3d rs, const Eigen::Vector3d ms){
+    Eigen::Vector3d r = rt - rs;
+    vec3 r_for_W = vec3(r[0], r[1], r[2]);
+    float r_norm = dot(r_for_W, r_for_W);
+    float Ar = (W_avr(r_for_W) - W(r_for_W))/pow(r_norm, 2);
+    float Ar_prime = (5 * W(r_for_W))/pow(r_norm, 3) - (5 * W_avr(r_for_W))/pow(r_norm, 3) - dWdr(r_for_W)/pow(r_norm, 2);
+    Ts = (Eigen::Matrix3d::Identity() * (r.transpose() * ms) + r * ms.transpose() + ms * r.transpose()) * Ar +
+            r * (r.transpose() * ms) *(r.transpose()/r_norm) * Ar_prime;
+}
+
+void Simulation::compute_m(const Eigen::VectorXd b){
+    Eigen::VectorXd Gamma_b = Gamma * b;
+    for(size_t i = 0; i < num_particles; i++){
+        pointers.particle_mag_moment[i] = vec3(Gamma_b.segment<3>(i * 3)[0],Gamma_b.segment<3>(i * 3)[1], Gamma_b.segment<3>(i * 3)[2]);
+    }
+}
+void Simulation::magnetization() {
+    for(size_t t = 0; t < num_particles; t++){
+        pointers.particle_H[t] = vec3(0.0f, 0.0f, 0.0f);
+        pointers.particle_M[t] = vec3(0.0f, 0.0f, 0.0f);
+        for(size_t s = 0; s < num_particles; s++){
+            pointers.particle_H[t] += H(pointers.particle_position[t] - pointers.particle_position[s], pointers.particle_mag_moment[s]);
+            pointers.particle_M[t] += pointers.particle_mag_moment[s] * W(pointers.particle_position[t] - pointers.particle_position[s]);
+        }
+    }
+}
+
+void Simulation::compute_magenetic_force() {
+    Eigen::VectorXd hext(3 * num_particles), b;
+    for(size_t i = 0; i < num_particles; i++){
+        hext << pointers.Hext[i][0], pointers.Hext[i][1], pointers.Hext[i][2];
+    }
+    Eigen::SparseMatrix<double> G;
+    G.resize(3 * num_particles, 3 * num_particles);
+    std::vector<Eigen::Triplet<double>> trip;
+    for(size_t j = 0; j < num_particles; j++){
+        trip.push_back(Eigen::Triplet<double>(3 * j, 3 * j, pointers.particle_position[j][0]));
+        trip.push_back(Eigen::Triplet<double>(3 * j + 1, 3 * j + 1, pointers.particle_position[j][1]));
+        trip.push_back(Eigen::Triplet<double>(3 * j + 2, 3 * j + 2, pointers.particle_position[j][2]));
+    }
+    G.setFromTriplets(trip.begin(), trip.end());
+    Eigen::SparseMatrix<double> ident;
+    ident.setIdentity();
+    Eigen::SparseMatrix<double> A = G * Gamma - ident;
+    Eigen::ConjugateGradient<Eigen::SparseMatrix<double>>cg;
+    cg.compute(A);
+    b = cg.solve(-1.0 * hext);
+    b = cg.solve(-1.0 * hext);
+    compute_m(b);
+    Eigen::Vector3d m_hat, ft;
+    Eigen::Matrix3d R, Ts, T_hat;
+    double q;
+    double dist;
+    for(size_t t = 0; t < num_particles; t++){
+        Eigen::Matrix3d U;
+        U.setZero();
+        Eigen::Vector3d rt, mt;
+        rt << pointers.particle_position[t][0], pointers.particle_position[t][1], pointers.particle_position[t][2];
+        mt << pointers.particle_mag_moment[t][0], pointers.particle_mag_moment[t][1], pointers.particle_mag_moment[t][2];
+        for(size_t s = 0; s < num_particles; s++){
+            Eigen::Vector3d rs, ms;
+            rs << pointers.particle_position[s][0], pointers.particle_position[s][1], pointers.particle_position[s][2];
+            ms << pointers.particle_mag_moment[s][0], pointers.particle_mag_moment[s][1], pointers.particle_mag_moment[s][2];
+            dist = (rt-rs).norm();
+            if ( dist < 4.0 * h){
+                q = dist/h;
+                get_R(R, rt, rs); //note rs is the source!
+                m_hat = R * ms;
+                get_T_hat(T_hat, m_hat);
+                Ts = R * T_hat * R.transpose();
+            }
+            else{
+                get_Force_Tensor(Ts, rt, rs, ms);
+            }
+            U += Ts;
+        }
+        ft = U * mt;
+        pointers.particle_mag_force[t] = vec3(ft[0], ft[1], ft[2]);
+    }
+}
+
 void Simulation::run_step_adami() {
     build_grid();
     find_neighbors();
