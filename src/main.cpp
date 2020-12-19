@@ -12,9 +12,16 @@ int main() {
     {
         std::random_device rd;
         std::uniform_real_distribution<float> dist;
-        for (float x = 0.1; x < 0.8; x += 0.02) {
-            for (float z = 0.1; z < 0.8; z += 0.02) {
-                for (float y = 0.1; y < 0.50; y += 0.02) {
+        for (float x = 0.0; x < 1.0; x += 0.02) {
+            for (float z = 0.0; z < 1.0; z += 0.02) {
+                for (float y = 0.0; y < 0.13; y += 0.02) {
+                    particles.emplace_back(x, y, z);
+                }
+            }
+        }
+        for (float x = 0.4; x < 0.6; x += 0.02) {
+            for (float z = 0.4; z < 0.6; z += 0.02) {
+                for (float y = 0.5; y < 0.6; y += 0.02) {
                     particles.emplace_back(x, y, z);
                 }
             }
@@ -69,7 +76,7 @@ int main() {
         }
         Eigen::MatrixXd V;
         Eigen::MatrixXi F;
-        reconstruct(V, F, P, Eigen::Vector3i(50,50,50), mass, density, sim.h);
+        reconstruct(V, F, P, Eigen::Vector3i(200, 200, 200), mass, density, sim.h);
         igl::writeOBJ("sim.obj", V, F);
     }
 }
