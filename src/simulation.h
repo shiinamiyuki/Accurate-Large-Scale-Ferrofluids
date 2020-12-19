@@ -98,7 +98,7 @@ class Simulation {
     float gamma = 7;
     float kappa = 1.0;
     float alpha = 0.5;
-    float dt = 0.0001;
+    float dt = 0.001;
     int size = 0;
     float mass = 0.0;
     float h = 2 * radius;       // kernel size
