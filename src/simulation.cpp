@@ -479,7 +479,7 @@ void Simulation::run_step_adami() {
             dt * 0.5f * pointers.particle_velocity[id]; // r(t+dt) = r(t+dt/2) + dt/2 * v(t+dt/2)
     });
     if (n_iter % 10 == 0) {
-        printf("compute magnetic force\n");
+        printf("compute magnetic force; iter=%zu\n", n_iter);
         compute_magenetic_force();
     }
     tbb::parallel_for(size_t(0), num_particles, [=](size_t id) {
