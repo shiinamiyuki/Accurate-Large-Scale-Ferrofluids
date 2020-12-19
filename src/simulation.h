@@ -11,6 +11,7 @@
 #include <vector>
 #include <Eigen/Core>
 #include <Eigen/Sparse>
+#include <Eigen/Geometry>
 
 using glm::ivec2;
 using glm::ivec3;
@@ -130,7 +131,9 @@ class Simulation {
     float dWdr(vec3 r);
     void eval_Hext();
     void get_R(Eigen::Matrix3d &R, const Eigen::Vector3d &rt, const Eigen::Vector3d &rs);
-    void get_T_hat(Eigen::Matrix3d &Ts, const Eigen::Vector3d &ms);
+    float get_C1(float &q);
+    float get_C2(float &q);
+    void get_T_hat(Eigen::Matrix3d &Ts, const Eigen::Vector3d &m_hat_s, float & q);
     void get_Force_Tensor(Eigen::Matrix3d &Ts, const Eigen::Vector3d &rt, const Eigen::Vector3d &rs, const Eigen::Vector3d &ms);
     void compute_m(const Eigen::VectorXd &b);
     void magnetization();

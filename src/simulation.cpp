@@ -288,11 +288,61 @@ void Simulation::eval_Hext() {
 
 void Simulation::get_R(Eigen::Matrix3d &R, const Eigen::Vector3d &rt, const Eigen::Vector3d &rs){
     // given rt and rs world coordinate, transform it to the coordinate where rs is on origin
-    // let (zeta, eta, xi) be the unit vectors and assume rt is on its 
+    // let (xi, eta, zeta) be the unit vectors and assume rt is on its zeta axis.
+    Eigen::Vector3d zeta = (rt - rs).normalized();
+    Eigen::Vector3d y, z;
+    y << 0, 1, 0;
+    z << 0, 0, 1;
+    Eigen::Vector3d eta = zeta.cross(z);
+    eta[1] = 1e-10;
+    eta.normalize();
+    Eigen::Vector3d xi = eta.cross(zeta);
+    R.col(0) = xi;
+    R.col(1) = eta;
+    R.col(2) = zeta;
 }
 
-void Simulation::get_T_hat(Eigen::Matrix3d &T_hat, const Eigen::Vector3d &ms){
-    // have no idea wtf is c here, need to read the paper more times.
+// data provided in appendix
+float Simulation::get_C1(float &q){
+    float C1;
+    if (0 < q&&q <= 1){
+        C1 = q*(q*(q*(q*(9.97813616438174e-09)+(-2.97897856524718e-08))+(2.38918644566813e-09))+(4.53199938857366e-08))+(2.44617454752747e-11);
+    }
+    else if (1 < q&&q <= 2){
+        C1 = q*(q*(q*(q*(-2.76473728643294e-09)+(2.86975546540539e-08))+(-9.94582836806651e-08))+(1.25129924573675e-07))+(-2.37010166723652e-08);
+    }
+    else if (2 < q&&q <= 3){
+        C1 = q*(q*(q*(q*(-1.09679990621465e-09)+(9.77055663264614e-09))+(-2.54781238661150e-08))+(2.65020634884934e-09))+(5.00787562417835e-08);
+    }
+    else if (3 < q&&q <= 4){
+        C1 = q*(q*(q*(q*(3.79927162333632e-10)+(-6.26368404962679e-09))+(3.94760528277489e-08))+(-1.13580541622200e-07))+(1.27491333574323e-07);
+    }
+    return C1;
+}
+
+float Simulation::get_C2(float &q){
+    float C2;
+    if (0 < q&&q <= 1){
+        C2 = q*(q*(q*(q*(6.69550479838731e-08)+(-1.61753307173877e-07))+(1.68213714992711e-08))+(1.34558143036838e-07))+(1.10976027980100e-10);
+    }
+    else if (1 < q&&q <= 2){
+        C2 = q*(q*(q*(q*(-3.08460139955194e-08)+(2.29192245602275e-07))+(-5.88399621128587e-07))+(5.61170054591844e-07))+(-1.14421132829680e-07);
+    }
+    else if (2 < q&&q <= 3){
+        C2 = q*(q*(q*(q*(3.50477408060213e-09)+(-5.25956271895141e-08))+(2.78876509535747e-07))+(-6.24199554212217e-07))+(4.91807818904985e-07);
+    }
+    else if (3 < q&&q <= 4){
+        C2 = q*(q*(q*(q*(7.33485346367840e-10)+(-9.58855788627803e-09))+(4.37085309763591e-08))+(-7.48004594092261e-08))+(2.34161209605651e-08);
+    }
+    return C2;
+}
+
+void Simulation::get_T_hat(Eigen::Matrix3d &T_hat, const Eigen::Vector3d &m_hat_s, float & q){
+    float C1 = get_C1(q);
+    float C2 = get_C2(q);
+    T_hat << m_hat_s[2] * C1, 0, m_hat_s[0] * C1,
+             0, m_hat_s[2] * C1, m_hat_s[1] * C1,
+             m_hat_s[0] * C1, m_hat_s[1] * C1, m_hat_s[2] * C2;
 }
 
 void Simulation::get_Force_Tensor(Eigen::Matrix3d &Ts, const Eigen::Vector3d &rt, const Eigen::Vector3d &rs, const Eigen::Vector3d &ms){
@@ -346,7 +396,7 @@ void Simulation::compute_magenetic_force() {
     compute_m(b);
     Eigen::Vector3d m_hat, ft;
     Eigen::Matrix3d R, Ts, T_hat;
-    double q;
+    float q;
     double dist;
     for(size_t t = 0; t < num_particles; t++){
         Eigen::Matrix3d U;
@@ -362,8 +412,8 @@ void Simulation::compute_magenetic_force() {
             if ( dist < 4.0 * h){
                 q = dist/h;
                 get_R(R, rt, rs); //note rs is the source!
-                m_hat = R * ms;
-                get_T_hat(T_hat, m_hat);
+                m_hat = R.transpose() * ms;
+                get_T_hat(T_hat, m_hat, q);
                 Ts = R * T_hat * R.transpose();
             }
             else{
