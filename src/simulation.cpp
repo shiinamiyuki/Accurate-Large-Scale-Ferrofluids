@@ -292,8 +292,18 @@ void Simulation::eval_Hext() {
     // still need some thinking here
     // single point magnetic field
     // lets try with (0, 1, 0)
+    // for (size_t i = 0; i < num_particles; i++) {
+    //     pointers.Hext[i] = vec3(0, 1, 0);
+    // }
+    const double mu0 = 1.25663706212e-16;
+    dvec3 m(0, 1, 0);
+    dvec3 dipole(0.5, -0.1, 0.5);
     for (size_t i = 0; i < num_particles; i++) {
-        pointers.Hext[i] = vec3(0, 1, 0);
+        dvec3 p = pointers.particle_position[i];
+        dvec3 r = p - dipole;
+        auto r_hat = normalize(r);
+        auto H = 1 / (4 * pi) * ((3.0 * r_hat * dot(m, r_hat) - m) / (std::pow(length(r), 3)));
+        pointers.Hext[i] = vec3(H);
     }
 }
 
@@ -460,6 +470,9 @@ void Simulation::compute_magenetic_force() {
 }
 
 void Simulation::run_step_adami() {
+    if (n_iter == 0) {
+        eval_Hext();
+    }
     build_grid();
     find_neighbors();
     tbb::parallel_for(size_t(0), num_particles, [=](size_t id) {
