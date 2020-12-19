@@ -227,6 +227,9 @@ void Simulation::run_step_euler() {
 
 vec3 Simulation::H(vec3 r, vec3 m) {
     float r_norm = dot(r, r);
+    if (r_norm == 0.0) {
+        return vec3(0);
+    }
     vec3 r_hat = normalize(r);
     vec3 H_r = dot(r_hat, m) * (W_avr(r) - W(r)) * r_hat - (W_avr(r) / 3.0f) * m;
     CHECK(!glm::any(glm::isnan(H_r)));
@@ -235,6 +238,9 @@ vec3 Simulation::H(vec3 r, vec3 m) {
 
 float Simulation::W_avr(vec3 r) {
     float r_norm = dot(r, r);
+    if (r_norm == 0.0) {
+        return 0.0;
+    }
     float W_r_h = 0.0;
     float q = r_norm / h;
     if (0 <= q && q < 1) {
