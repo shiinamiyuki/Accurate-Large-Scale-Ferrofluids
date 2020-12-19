@@ -42,6 +42,7 @@ using glm::vec3;
     [&] {                                                                                                              \
         if (!(expr)) {                                                                                                 \
             fprintf(stderr, #expr " failed at %s:%d\n", __FILE__, __LINE__);                                           \
+            abort();                                                                                                   \
         }                                                                                                              \
     }()
 class Simulation {
@@ -116,6 +117,7 @@ class Simulation {
         auto ip = get_cell(p);
         return get_index_i(ip);
     }
+    size_t n_iter = 0;
     size_t num_particles = 4000;
     void build_grid();
     void find_neighbors();

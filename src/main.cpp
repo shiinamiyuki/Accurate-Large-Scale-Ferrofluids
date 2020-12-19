@@ -12,20 +12,20 @@ int main() {
     {
         std::random_device rd;
         std::uniform_real_distribution<float> dist;
-        for (float x = 0.0; x < 1.0; x += 0.02) {
-            for (float z = 0.0; z < 1.0; z += 0.02) {
-                for (float y = 0.0; y < 0.13; y += 0.02) {
+        for (float x = 0.0; x < 1.0; x += 0.05) {
+            for (float z = 0.0; z < 1.0; z += 0.05) {
+                for (float y = 0.0; y < 0.13; y += 0.05) {
                     particles.emplace_back(x, y, z);
                 }
             }
         }
-        for (float x = 0.4; x < 0.6; x += 0.02) {
-            for (float z = 0.4; z < 0.6; z += 0.02) {
-                for (float y = 0.5; y < 0.6; y += 0.02) {
-                    particles.emplace_back(x, y, z);
-                }
-            }
-        }
+        // for (float x = 0.4; x < 0.6; x += 0.02) {
+        //     for (float z = 0.4; z < 0.6; z += 0.02) {
+        //         for (float y = 0.5; y < 0.6; y += 0.02) {
+        //             particles.emplace_back(x, y, z);
+        //         }
+        //     }
+        // }
         // for(int i= 0;i < 4000;i++){
         //     particles.emplace_back(dist(rd), dist(rd), dist(rd));
         // }
