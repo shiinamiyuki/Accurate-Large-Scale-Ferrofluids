@@ -9,6 +9,8 @@
 #include <glm/glm.hpp>
 #include <memory>
 #include <vector>
+#include <Eigen/Core>
+#include <Eigen/Sparse>
 
 using glm::ivec2;
 using glm::ivec3;
@@ -63,6 +65,7 @@ class Simulation {
         std::unique_ptr<vec3[]> particle_H;
         std::unique_ptr<vec3[]> particle_M;
         std::unique_ptr<vec3[]> particle_mag_moment;
+        std::unique_ptr<vec3[]> particle_mag_force;
         std::unique_ptr<vec3[]> Hext;
         std::unique_ptr<float[]> density;
         std::unique_ptr<vec3[]> dvdt;
@@ -78,6 +81,7 @@ class Simulation {
         vec3 *particle_H = nullptr;
         vec3 *particle_M = nullptr;
         vec3 *particle_mag_moment = nullptr;
+        vec3 *particle_mag_force = nullptr;
         vec3 *Hext = nullptr;
         float *density = nullptr;
         vec3 *dvdt = nullptr;
@@ -99,7 +103,7 @@ class Simulation {
     float mass = 0.0;
     float h = 2 * radius;       // kernel size
     float susceptibility = 0.8; // material susceptibility
-    float Gamma = pow(0.02, 3) * (susceptibility / (1 + susceptibility));
+    float Gamma = pow(radius, 3) * (susceptibility / (1 + susceptibility));
     ivec3 grid_size;
     uint32_t get_index_i(const ivec3 &p) const { return p.x + p.y * grid_size.x + p.z * grid_size.x * grid_size.y; }
     ivec3 get_cell(const vec3 &p) const {
@@ -123,7 +127,12 @@ class Simulation {
     vec3 H(vec3 r, vec3 m);
     float W_avr(vec3 r);
     float W(vec3 r);
+    float dWdr(vec3 r);
     void eval_Hext();
+    void get_R(Eigen::Matrix3d R, const Eigen::Vector3d rt, const Eigen::Vector3d rs);
+    void get_T_hat(Eigen::Matrix3d Ts, const Eigen::Vector3d ms);
+    void get_Force_Tensor(Eigen::Matrix3d Ts, const Eigen::Vector3d rt, const Eigen::Vector3d rs, const Eigen::Vector3d ms);
+    void compute_m(const Eigen::VectorXd b);
     void magnetization();
     void compute_magenetic_force();
 
