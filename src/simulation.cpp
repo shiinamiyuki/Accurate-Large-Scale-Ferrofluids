@@ -286,16 +286,16 @@ void Simulation::eval_Hext() {
     // single point magnetic field
 }
 
-void Simulation::get_R(Eigen::Matrix3d R, const Eigen::Vector3d rt, const Eigen::Vector3d rs){
+void Simulation::get_R(Eigen::Matrix3d &R, const Eigen::Vector3d &rt, const Eigen::Vector3d &rs){
     // given rt and rs world coordinate, transform it to the coordinate where rs is on origin
     // let (zeta, eta, xi) be the unit vectors and assume rt is on its 
 }
 
-void Simulation::get_T_hat(Eigen::Matrix3d T_hat, const Eigen::Vector3d ms){
+void Simulation::get_T_hat(Eigen::Matrix3d &T_hat, const Eigen::Vector3d &ms){
     // have no idea wtf is c here, need to read the paper more times.
 }
 
-void Simulation::get_Force_Tensor(Eigen::Matrix3d Ts, const Eigen::Vector3d rt, const Eigen::Vector3d rs, const Eigen::Vector3d ms){
+void Simulation::get_Force_Tensor(Eigen::Matrix3d &Ts, const Eigen::Vector3d &rt, const Eigen::Vector3d &rs, const Eigen::Vector3d &ms){
     Eigen::Vector3d r = rt - rs;
     vec3 r_for_W = vec3(r[0], r[1], r[2]);
     float r_norm = dot(r_for_W, r_for_W);
@@ -305,7 +305,7 @@ void Simulation::get_Force_Tensor(Eigen::Matrix3d Ts, const Eigen::Vector3d rt, 
             r * (r.transpose() * ms) *(r.transpose()/r_norm) * Ar_prime;
 }
 
-void Simulation::compute_m(const Eigen::VectorXd b){
+void Simulation::compute_m(const Eigen::VectorXd &b){
     Eigen::VectorXd Gamma_b = Gamma * b;
     for(size_t i = 0; i < num_particles; i++){
         pointers.particle_mag_moment[i] = vec3(Gamma_b.segment<3>(i * 3)[0],Gamma_b.segment<3>(i * 3)[1], Gamma_b.segment<3>(i * 3)[2]);
