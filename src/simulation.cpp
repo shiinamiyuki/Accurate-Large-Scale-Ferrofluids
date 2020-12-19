@@ -101,7 +101,7 @@ void Simulation::find_neighbors() {
     });
 }
 vec3 Simulation::dvdt_momentum_term(size_t id) {
-    const vec3 gravity(0.0, -0.0098, 0.0);
+    const vec3 gravity(0.0, -0.098, 0.0);
     CHECK(mass != 0.0);
     vec3 dvdt(0.0);
     auto ra = pointers.particle_position[id];
