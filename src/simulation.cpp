@@ -317,7 +317,7 @@ void Simulation::eval_Hext() {
     //     pointers.Hext[i] = vec3(0, 1, 0);
     // }
     const double mu0 = 1.25663706212e-16;
-    dvec3 m(0, 4, 0);
+    dvec3 m(0, 10, 0);
 
     for (size_t i = 0; i < num_particles; i++) {
         dvec3 p = pointers.particle_position[i];
@@ -332,11 +332,13 @@ void Simulation::get_R(Eigen::Matrix3d &R, const Eigen::Vector3d &rt, const Eige
     // given rt and rs world coordinate, transform it to the coordinate where rs is on origin
     // let (xi, eta, zeta) be the unit vectors and assume rt is on its zeta axis.
     Eigen::Vector3d zeta = (rt - rs).normalized();
-    Eigen::Vector3d y, z;
-    y << 0, 1, 0;
-    z << 0, 0, 1;
+    Eigen::Vector3d z;
+    if (abs(zeta.x()) < 1e-2) {
+        z << 0, 0, 1;
+    } else {
+        z << 0, 1, 0;
+    }
     Eigen::Vector3d eta = zeta.cross(z);
-    eta[1] = 1e-10;
     eta.normalize();
     Eigen::Vector3d xi = eta.cross(zeta);
     R.col(0) = xi;
@@ -433,22 +435,21 @@ void Simulation::compute_magenetic_force() {
     for (size_t i = 0; i < num_particles; i++) {
         hext.segment<3>(3 * i) << pointers.Hext[i][0], pointers.Hext[i][1], pointers.Hext[i][2];
     }
-
+    magnetization();
     Eigen::SparseMatrix<double> G;
     G.resize(3 * num_particles, 3 * num_particles);
     std::vector<Eigen::Triplet<double>> trip;
     for (size_t j = 0; j < num_particles; j++) {
-        dvec3 r(pointers.particle_position[j][0], pointers.particle_position[j][1], pointers.particle_position[j][2]);
-        r -= dipole;
-        // trip.push_back(Eigen::Triplet<double>(3 * j, 3 * j, pointers.particle_position[j][0]));
-        // trip.push_back(Eigen::Triplet<double>(3 * j + 1, 3 * j + 1, pointers.particle_position[j][1]));
-        // trip.push_back(Eigen::Triplet<double>(3 * j + 2, 3 * j + 2, pointers.particle_position[j][2]));
-        for (int k = 0; k < 3; k++) {
-            trip.emplace_back(3 * k, 3 * k, r[k]);
-        }
-        // for (int k = 0; k < 3; k++) {
-        //     trip.emplace_back(3 * k, 3 * k, pointers.particle_H[j][k] + pointers.particle_M[j][k]);
+        // dvec3 r(pointers.particle_position[j][0], pointers.particle_position[j][1],
+        // pointers.particle_position[j][2]); r -= dipole; trip.push_back(Eigen::Triplet<double>(3 * j, 3 * j,
+        // pointers.particle_position[j][0])); trip.push_back(Eigen::Triplet<double>(3 * j + 1, 3 * j + 1,
+        // pointers.particle_position[j][1])); trip.push_back(Eigen::Triplet<double>(3 * j + 2, 3 * j + 2,
+        // pointers.particle_position[j][2])); for (int k = 0; k < 3; k++) {
+        //     trip.emplace_back(3 * k, 3 * k, r[k]);
         // }
+        for (int k = 0; k < 3; k++) {
+            trip.emplace_back(3 * j + k, 3 * j + k, pointers.particle_H[j][k] + pointers.particle_M[j][k]);
+        }
     }
 
     G.setFromTriplets(trip.begin(), trip.end());
@@ -461,7 +462,7 @@ void Simulation::compute_magenetic_force() {
     b = cg.solve(-1.0 * hext);
     // b = cg.solve(-1.0 * hext);
     compute_m(b);
-    magnetization();
+
     Eigen::Vector3d m_hat, ft;
     Eigen::Matrix3d R, Ts, T_hat;
     float q;
