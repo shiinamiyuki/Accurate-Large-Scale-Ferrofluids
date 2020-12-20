@@ -259,11 +259,12 @@ Eigen::Matrix3d Simulation::H_mat(vec3 r, vec3 m) {
         mat += Eigen::Matrix3d::Identity() * W_avr(r) / 3.0;
         auto k = W_avr(r) - W(r);
         Eigen::Matrix3d A;
-        A << r_hat[0] * r_hat[0], r_hat[0] * r_hat[1], r_hat[0] * r_hat[1], // .
-            r_hat[1] * r_hat[0], r_hat[1] * r_hat[1], r_hat[1] * r_hat[1],  // .
-            r_hat[2] * r_hat[0], r_hat[2] * r_hat[1], r_hat[2] * r_hat[1];  // .
+        A << r_hat[0] * r_hat[0], r_hat[0] * r_hat[1], r_hat[0] * r_hat[2], // .
+            r_hat[1] * r_hat[0], r_hat[1] * r_hat[1], r_hat[1] * r_hat[2],  // .
+            r_hat[2] * r_hat[0], r_hat[2] * r_hat[1], r_hat[2] * r_hat[2];  // .
         mat += k * A;
     }
+    // printf("%lf\n", mat * Eigen::Vector3d(m.x,m.y,m.z), H(r, m));
     return mat;
 }
 vec3 Simulation::H(vec3 r, vec3 m) {
@@ -727,10 +728,11 @@ void Simulation::compute_magenetic_force() {
             //     trip.emplace_back(3 * j + k, 3 * j + k, pointers.particle_H[j][k] + pointers.particle_M[j][k]);
             // }
             Eigen::Matrix3d Hi = H_mat(r, mj);
+            Eigen::Matrix3d Wi = Eigen::Matrix3d::Identity() * W(r);
             // std::cout << Hi << std::endl;
             for (int a = 0; a < 3; a++) {
                 for (int b = 0; b < 3; b++) {
-                    trip.emplace_back(3 * j + a, 3 * j + b, Hi(a, b) + W(r));
+                    trip.emplace_back(3 * j + a, 3 * j + b, Hi(a, b) + Wi(a, b));
                 }
             }
         }
@@ -755,7 +757,7 @@ void Simulation::compute_magenetic_force() {
     // std::cout << b << std::endl;
     // for (size_t t = 0; t < num_particles; t++) {
     tbb::parallel_for<size_t>(0, num_particles, [&](size_t t) {
-#if 1
+#if 0
         Eigen::Vector3d m_hat, ft;
         Eigen::Matrix3d R, Ts, T_hat;
 
@@ -780,17 +782,17 @@ void Simulation::compute_magenetic_force() {
                 m_hat = R.transpose() * ms;
                 get_T_hat(T_hat, m_hat, q);
                 Ts = R * T_hat * R.transpose(); // * 10000000.0;
-                // std::cout << Ts << std::endl;
+                std::cout << Ts << std::endl;
             } else {
                 get_Force_Tensor(Ts, rt, rs, ms);
                 // Ts *= 0.1;
-                // Ts *= mu0;
+                Ts *= mu0;
             }
             U += Ts;
         }
         ft = U * mt;
         dvec3 F = dvec3(ft[0], ft[1], ft[2]);
-        F += glm::dmat3(dHext(dvec3(pointers.particle_position[t]) - dipole)) * dvec3(mt[0], mt[1], mt[2]); // * mu0;
+        F += glm::dmat3(dHext(dvec3(pointers.particle_position[t]) - dipole)) * dvec3(mt[0], mt[1], mt[2]) * mu0;
         pointers.particle_mag_force[t] = vec3(F);
 #else
         mat3 U(0.0);
@@ -813,7 +815,8 @@ void Simulation::compute_magenetic_force() {
             }
             U += Bij;
         }
-        auto ft = U * mt +  dHext(dvec3(pointers.particle_position[t]) - dipole) * mt;
+        auto ft = U * mt;
+        ft += glm::dmat3(dHext(dvec3(pointers.particle_position[t]) - dipole)) * dvec3(mt[0], mt[1], mt[2]) * mu0;
         // ft += mu0 * mt 
         pointers.particle_mag_force[t] = ft;
 // printf("%f\n", length(ft));

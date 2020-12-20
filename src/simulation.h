@@ -51,7 +51,7 @@ using glm::vec3;
 static constexpr double pi = 3.1415926535897;
 class Simulation {
   public:
-    const double mu0 = 1.25663706212e-16;
+    const double mu0 = 1.25663706212e-6;
     struct Cell {
         static constexpr size_t max_particles = 100;
         std::array<uint32_t, max_particles> particles;
@@ -113,7 +113,7 @@ class Simulation {
     float Gamma = pow(radius, 3) * (susceptibility / (1 + susceptibility));
     ivec3 grid_size;
     dvec3 dipole = dvec3(0.5, -0.6, 0.5);
-    dvec3 m = dvec3(0, 10, 0);
+    dvec3 m = dvec3(0, 1e5, 0);
     uint32_t get_index_i(const ivec3 &p) const { return p.x + p.y * grid_size.x + p.z * grid_size.x * grid_size.y; }
     ivec3 get_cell(const vec3 &p) const {
         ivec3 ip = p * vec3(grid_size);
