@@ -8,7 +8,7 @@
 #include <tbb/parallel_for.h>
 
 void reconstruct(Eigen::MatrixXd &V, Eigen::MatrixXi &F, const Eigen::MatrixXd &P, const Eigen::Vector3i &res,
-                 const Eigen::VectorXd &mass, const Eigen::VectorXd &density, double h) {
+                 const Eigen::VectorXd &mass, const Eigen::VectorXd &density, double h, double isovalue) {
     auto W_k = 10. / (7. * igl::PI);
     auto kernel_P = [&](double r) {
         auto q = r;
@@ -243,5 +243,5 @@ void reconstruct(Eigen::MatrixXd &V, Eigen::MatrixXi &F, const Eigen::MatrixXd &
     // std::cout << S << std::endl;
     printf("S.mean() = %f\n", S.mean());
 
-    marching_cubes(S, GV, res[0], res[1], res[2], 1.0, V, F);
+    marching_cubes(S, GV, res[0], res[1], res[2], isovalue, V, F);
 }

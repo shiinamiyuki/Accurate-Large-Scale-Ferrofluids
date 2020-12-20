@@ -104,10 +104,12 @@ class Simulation {
     float rho0 = 1000;
     float gamma = 7;
     float kappa = 1.0;
-    float alpha = 0.04;
-    float dt = 0.0001;
+    float alpha = 1.0;
+    float dt = 0.001;
     int size = 0;
     float mass = 0.0;
+    bool enable_gravity = true;
+    bool enable_interparticle_magnetization = false;
     float h = 2 * radius;       // kernel size
     float susceptibility = 0.8; // material susceptibility
     float Gamma = pow(radius, 3) * (susceptibility / (1 + susceptibility));

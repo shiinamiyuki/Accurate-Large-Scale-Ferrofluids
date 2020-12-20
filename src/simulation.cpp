@@ -130,7 +130,8 @@ vec3 Simulation::dvdt_momentum_term(size_t id) {
         CHECK(rho_a != 0.0);
         dvdt += -mass * (Pa / (rho_a * rho_a) + Pb / (rho_b * rho_b)) * gradW(ra - rb, dh);
     }
-    // dvdt += gravity;
+    if (enable_gravity)
+        dvdt += gravity;
     CHECK(!glm::any(glm::isnan(dvdt)));
     return dvdt;
 }
@@ -293,8 +294,7 @@ float Simulation::W_avr(vec3 r) {
     if (0 <= q && q < 1) {
         W_r_h = (1.0 / 40.0) * (15.0 * q3 - 36 * q2 + 40.0);
     } else if (1 <= q && q < 2) {
-        W_r_h = (-3.0 / (4.0 *q3)) *
-                (q6 / 6.0 - (6.0 * q5) / 5.0 + 3.0 * pow(q, 4) - (8.0 * q3) / 3.0 + 1.0 / 15.0);
+        W_r_h = (-3.0 / (4.0 * q3)) * (q6 / 6.0 - (6.0 * q5) / 5.0 + 3.0 * pow(q, 4) - (8.0 * q3) / 3.0 + 1.0 / 15.0);
     } else {
         W_r_h = 3.0 / (4.0 * q3);
     }
@@ -721,12 +721,16 @@ void Simulation::compute_magenetic_force() {
     for (size_t i = 0; i < num_particles; i++) {
         hext.segment<3>(3 * i) << pointers.Hext[i][0], pointers.Hext[i][1], pointers.Hext[i][2];
     }
+    if (enable_interparticle_magnetization) {
+        // magnetization();
+        Eigen::SparseMatrix<double> G;
+        G.resize(3 * num_particles, 3 * num_particles);
+        Eigen::MatrixXd G_tmp;
+        G_tmp.resize(3 * num_particles, 3);
+        G_tmp.setZero();
+        // G.setZero();
+        std::vector<Eigen::Triplet<double>> trip;
 #if 0
-    // magnetization();
-    Eigen::SparseMatrix<double> G;
-    G.resize(3 * num_particles, 3 * num_particles);
-    // G.setZero();
-    std::vector<Eigen::Triplet<double>> trip;
     for (size_t i = 0; i < num_particles; i++) {
         vec3 ri = pointers.particle_position[i];
         for (size_t j = 0; j < num_particles; j++) {
@@ -753,23 +757,45 @@ void Simulation::compute_magenetic_force() {
             }
         }
     }
-
-    G.setFromTriplets(trip.begin(), trip.end());
-    Eigen::SparseMatrix<double> ident;
-    ident.resize(3 * num_particles, 3 * num_particles);
-    ident.setIdentity();
-    Eigen::SparseMatrix<double> A = G * Gamma - ident;
-    Eigen::LeastSquaresConjugateGradient<Eigen::SparseMatrix<double>> cg;
-    cg.compute(A);
-
-    b = cg.solve(-1.0 * hext);
-    printf("%lf\n", b.norm());
-    compute_m(b);
-    // b = cg.solve(-1.0 * hext);
 #else
-    b = hext;
-    compute_m(b);
+        tbb::parallel_for<size_t>(0, num_particles, [&](size_t j) {
+            vec3 rj = pointers.particle_position[j];
+            vec3 mj = pointers.particle_mag_moment[j];
+            Eigen::Matrix3d tmp;
+            tmp.setZero();
+            for (size_t i = 0; i < num_particles; i++) {
+                vec3 ri = pointers.particle_position[i];
+                vec3 r = ri - rj;
+                Eigen::Matrix3d Hi = H_mat(r, mj);
+                Eigen::Matrix3d Wi = Eigen::Matrix3d::Identity() * W(r);
+                tmp += Hi + Wi;
+            }
+            G_tmp.block<3, 3>(3 * j, 0) = tmp;
+        });
+        for (size_t j = 0; j < num_particles; j++) {
+            for (int a = 0; a < 3; a++) {
+                for (int b = 0; b < 3; b++) {
+                    trip.emplace_back(3 * j + a, 3 * j + b, G_tmp(3 * j + a, b));
+                }
+            }
+        }
 #endif
+        G.setFromTriplets(trip.begin(), trip.end());
+        Eigen::SparseMatrix<double> ident;
+        ident.resize(3 * num_particles, 3 * num_particles);
+        ident.setIdentity();
+        Eigen::SparseMatrix<double> A = G * Gamma - ident;
+        Eigen::LeastSquaresConjugateGradient<Eigen::SparseMatrix<double>> cg;
+        cg.compute(A);
+
+        b = cg.solve(-1.0 * hext);
+        printf("%lf\n", b.norm());
+        compute_m(b);
+        // b = cg.solve(-1.0 * hext);
+    } else {
+        b = hext;
+        compute_m(b);
+    }
     // std::cout << b << std::endl;
     // for (size_t t = 0; t < num_particles; t++) {
     tbb::parallel_for<size_t>(0, num_particles, [&](size_t t) {

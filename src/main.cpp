@@ -1,19 +1,22 @@
 #include "reconstruction.h"
 #include "simulation.h"
 #include <Eigen/Core>
+#include <atomic>
 #include <chrono>
 #include <igl/opengl/glfw/Viewer.h>
 #include <igl/writeOBJ.h>
 #include <iostream>
 #include <random>
+#include <sstream>
 int main() {
     std::vector<vec3> particles;
     std::condition_variable cv;
+    std::atomic_bool run_sim = true;
     {
         std::random_device rd;
         std::uniform_real_distribution<float> dist;
-        for (float x = 0.4; x < 0.6; x += 0.02) {
-            for (float z = 0.4; z < 0.6; z += 0.02) {
+        for (float x = 0.4; x < 0.6; x += 0.014) {
+            for (float z = 0.4; z < 0.6; z += 0.014) {
                 for (float y = 0.0; y < 0.1; y += 0.01) {
                     particles.emplace_back(x, y, z);
                 }
@@ -44,21 +47,48 @@ int main() {
     Eigen::MatrixXd P;
     P.resize(0, 3);
     std::mutex m;
+    std::mutex sim_lk;
     std::thread sim_thd([&] {
         std::unique_lock<std::mutex> lk(m, std::defer_lock);
         while (flag) {
-            sim.run_step();
-            lk.lock();
-            P.resize(sim.buffers.num_particles, 3);
-            for (size_t i = 0; i < sim.buffers.num_particles; i++) {
-                auto p = sim.buffers.particle_position[i];
-                // printf("%f %f %f\n", p.x, p.y, p.z);
-                P.row(i) = Eigen::RowVector3d(p.x, p.y, p.z);
+            if (!run_sim) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            } else {
+                {
+                    std::lock_guard<std::mutex> lk2(sim_lk);
+                    sim.run_step();
+                }
+                lk.lock();
+                P.resize(sim.buffers.num_particles, 3);
+                for (size_t i = 0; i < sim.buffers.num_particles; i++) {
+                    auto p = sim.buffers.particle_position[i];
+                    // printf("%f %f %f\n", p.x, p.y, p.z);
+                    P.row(i) = Eigen::RowVector3d(p.x, p.y, p.z);
+                }
+                lk.unlock();
+                cv.notify_one();
             }
-            lk.unlock();
-            cv.notify_one();
         }
     });
+    auto write_obj = [&] {
+        Eigen::VectorXd mass, density;
+        {
+            std::lock_guard<std::mutex> lk(sim_lk);
+            mass.resize(sim.num_particles);
+            density.resize(sim.num_particles);
+            mass.setConstant(sim.mass);
+            for (size_t i = 0; i < sim.num_particles; i++) {
+                density[i] = sim.pointers.density[i];
+            }
+        }
+        Eigen::MatrixXd V;
+        Eigen::MatrixXi F;
+        reconstruct(V, F, P, Eigen::Vector3i(200, 200, 200), mass, density, sim.h, 0.1);
+        std::time_t result = std::time(nullptr);
+        std::ostringstream os;
+        os << "sim-" << result << ".obj";
+        igl::writeOBJ(os.str(), V, F);
+    };
     using Viewer = igl::opengl::glfw::Viewer;
     igl::opengl::glfw::Viewer viewer;
     viewer.data().set_edges(PP, PI, Eigen::RowVector3d(1, 0.47, 0.45));
@@ -70,23 +100,16 @@ int main() {
         }
         return false;
     };
+    viewer.callback_key_pressed = [&](Viewer &, unsigned int key, int) -> bool {
+        if (key == ' ') {
+            run_sim = !run_sim;
+        } else if (key == 'b') {
+            write_obj();
+        }
+        return false;
+    };
     viewer.core().is_animating = true;
     viewer.launch();
     flag = false;
-
     sim_thd.join();
-
-    {
-        Eigen::VectorXd mass, density;
-        mass.resize(sim.num_particles);
-        density.resize(sim.num_particles);
-        mass.setConstant(sim.mass);
-        for (size_t i = 0; i < sim.num_particles; i++) {
-            density[i] = sim.pointers.density[i];
-        }
-        Eigen::MatrixXd V;
-        Eigen::MatrixXi F;
-        reconstruct(V, F, P, Eigen::Vector3i(200, 200, 200), mass, density, sim.h);
-        igl::writeOBJ("sim.obj", V, F);
-    }
 }
