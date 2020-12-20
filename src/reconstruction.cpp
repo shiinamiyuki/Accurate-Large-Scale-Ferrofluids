@@ -243,5 +243,5 @@ void reconstruct(Eigen::MatrixXd &V, Eigen::MatrixXi &F, const Eigen::MatrixXd &
     // std::cout << S << std::endl;
     printf("S.mean() = %f\n", S.mean());
 
-    marching_cubes(S, GV, res[0], res[1], res[2], 0.5, V, F);
+    marching_cubes(S, GV, res[0], res[1], res[2], 1.0, V, F);
 }

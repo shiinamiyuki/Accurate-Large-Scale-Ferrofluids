@@ -169,7 +169,7 @@ vec3 Simulation::dvdt_tension_term(size_t id) {
         auto vab = va - vb;
         auto rab = ra - rb;
         if (length(rab) <= k * h) {
-            f += 10000.0f * mass * mass * float(std::cos(3 * pi / (2 * k * h) * length(rab))) * rab;
+            f += 40000.0f * mass * mass * float(std::cos(3 * pi / (2 * k * h) * length(rab))) * rab;
         }
     }
     CHECK(!glm::any(glm::isnan(f)));
@@ -584,7 +584,7 @@ void Simulation::visualize_field(Eigen::MatrixXd &P, Eigen::MatrixXi &F) {
                 p /= 10.0;
                 P.row(idx) = p;
                 auto h = Hext(dvec3(p[0], p[1], p[2]) - dipole);
-                P.row(idx + 1000) = p + Eigen::Vector3d(h[0], h[1], h[2]) * 0.01;
+                P.row(idx + 1000) = p + Eigen::Vector3d(h[0], h[1], h[2]).normalized() * 0.04;
                 F.row(idx) = Eigen::RowVector2i(idx, idx + 1000);
             }
         }
@@ -599,7 +599,7 @@ void Simulation::get_R(Eigen::Matrix3d &R, const Eigen::Vector3d &rt, const Eige
     if (abs(zeta.x()) < 1e-2) {
         z << 0, 0, 1;
     } else {
-        z << 0, 1, 0;
+        z << 1, 0, 0;
     }
     Eigen::Vector3d eta = zeta.cross(z);
     eta.normalize();
@@ -659,6 +659,7 @@ void Simulation::get_T_hat(Eigen::Matrix3d &T_hat, const Eigen::Vector3d &m_hat_
     float C2 = get_C2(q);
     T_hat << m_hat_s[2] * C1, 0, m_hat_s[0] * C1, 0, m_hat_s[2] * C1, m_hat_s[1] * C1, m_hat_s[0] * C1, m_hat_s[1] * C1,
         m_hat_s[2] * C2;
+    T_hat /= h * h * h * h;
 }
 
 void Simulation::get_Force_Tensor(Eigen::Matrix3d &Ts, const Eigen::Vector3d &rt, const Eigen::Vector3d &rs,
@@ -702,7 +703,7 @@ void Simulation::compute_magenetic_force() {
     for (size_t i = 0; i < num_particles; i++) {
         hext.segment<3>(3 * i) << pointers.Hext[i][0], pointers.Hext[i][1], pointers.Hext[i][2];
     }
-#if 0
+#if 1
     // magnetization();
     Eigen::SparseMatrix<double> G;
     G.resize(3 * num_particles, 3 * num_particles);
@@ -733,22 +734,23 @@ void Simulation::compute_magenetic_force() {
             }
         }
     }
-    
+
     G.setFromTriplets(trip.begin(), trip.end());
-   atrix<double> ident;
+    Eigen::SparseMatrix<double> ident;
     ident.resize(3 * num_particles, 3 * num_particles);
     ident.setIdentity();
     Eigen::SparseMatrix<double> A = G * Gamma - ident;
     Eigen::LeastSquaresConjugateGradient<Eigen::SparseMatrix<double>> cg;
     cg.compute(A);
-    
+
     b = cg.solve(-1.0 * hext);
     printf("%lf\n", b.norm());
+    compute_m(b);
     // b = cg.solve(-1.0 * hext);
-
-#endif
+#else
     b = hext;
     compute_m(b);
+#endif
     // std::cout << b << std::endl;
     // for (size_t t = 0; t < num_particles; t++) {
     tbb::parallel_for<size_t>(0, num_particles, [&](size_t t) {
@@ -777,18 +779,20 @@ void Simulation::compute_magenetic_force() {
                 m_hat = R.transpose() * ms;
                 get_T_hat(T_hat, m_hat, q);
                 Ts = R * T_hat * R.transpose();
+                // std::cout << Ts << std::endl;
             } else {
                 get_Force_Tensor(Ts, rt, rs, ms);
-                // Ts *= 0.01;
-                // // Ts *= mu0 * 1e6;
-                Ts *= -0.03;
+                // // Ts *= 0.01;
+                // // // Ts *= mu0 * 1e6;
+                // Ts *= -0.01;
+                Ts *= mu0;
             }
             U += Ts;
         }
         ft = U * mt;
-        vec3 F = vec3(ft[0], ft[1], ft[2]);
-        F += dHext(dvec3(pointers.particle_position[t]) - dipole) * vec3(mt[0], mt[1], mt[2]);
-        pointers.particle_mag_force[t] = F;
+        dvec3 F = dvec3(ft[0], ft[1], ft[2]);
+        F += glm::dmat3(dHext(dvec3(pointers.particle_position[t]) - dipole)) * dvec3(mt[0], mt[1], mt[2]) * mu0;
+        pointers.particle_mag_force[t] = vec3(F);
 #else
         mat3 U(0.0);
         auto rt = pointers.particle_position[t];
@@ -827,7 +831,8 @@ void Simulation::run_step_adami() {
     tbb::parallel_for(size_t(0), num_particles, [=](size_t id) {
         vec3 dvdt = dvdt_full(id);
         vec3 f = pointers.particle_mag_force[id];
-        pointers.dvdt[id] = dvdt + f / mass; // v(t + dt/2)
+        if (!glm::any(glm::isnan(f)))
+            pointers.dvdt[id] = dvdt + f / mass; // v(t + dt/2)
     });
     tbb::parallel_for(size_t(0), num_particles, [=](size_t id) {
         pointers.particle_velocity[id] += dt * 0.5f * pointers.dvdt[id]; // v(t + dt/2)
@@ -848,8 +853,9 @@ void Simulation::run_step_adami() {
     tbb::parallel_for(size_t(0), num_particles, [=](size_t id) {
         vec3 dvdt = dvdt_full(id);
         vec3 f = pointers.particle_mag_force[id];
-        CHECK(!glm::any(glm::isnan(f)));
-        pointers.dvdt[id] = dvdt + f / mass; // Insert magnetic force here
+        // CHECK(!glm::any(glm::isnan(f)));
+        if (!glm::any(glm::isnan(f)))
+            pointers.dvdt[id] = dvdt + f / mass; // Insert magnetic force here
     });
     tbb::parallel_for(size_t(0), num_particles, [=](size_t id) {
         pointers.particle_velocity[id] += dt * 0.5f * pointers.dvdt[id];
