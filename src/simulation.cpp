@@ -1,8 +1,9 @@
 #include "simulation.h"
+#include "original.h"
 #include <Eigen/Core>
 #include <Eigen/Sparse>
 #include <tbb/parallel_for.h>
-constexpr double pi = 3.1415926535897;
+
 // https://github.com/erizmr/SPH_Taichi
 static inline double W(double r, double h) {
     auto k = 10. / (7. * pi * h * h);
@@ -314,10 +315,10 @@ void Simulation::eval_Hext() {
     // single point magnetic field
     // lets try with (0, 1, 0)
     // for (size_t i = 0; i < num_particles; i++) {
-    //     pointers.Hext[i] = vec3(0, 1, 0);
+    //     pointers.Hext[i] = vec3(1, 0, 0);
     // }
-    const double mu0 = 1.25663706212e-16;
-    dvec3 m(0, 10, 0);
+    // const double mu0 = 1.25663706212e-16;
+    dvec3 m(0, 100, 0);
 
     for (size_t i = 0; i < num_particles; i++) {
         dvec3 p = pointers.particle_position[i];
@@ -408,6 +409,7 @@ void Simulation::get_Force_Tensor(Eigen::Matrix3d &Ts, const Eigen::Vector3d &rt
         (5 * W(r_for_W)) / pow(r_norm, 3) - (5 * W_avr(r_for_W)) / pow(r_norm, 3) - dWdr(r_for_W) / pow(r_norm, 2);
     Ts = (Eigen::Matrix3d::Identity() * (r.transpose() * ms) + r * ms.transpose() + ms * r.transpose()) * Ar +
          r * (r.transpose() * ms) * (r.transpose() / r_norm) * Ar_prime;
+    // Ts *= mu0;
 }
 
 void Simulation::compute_m(const Eigen::VectorXd &b) {
@@ -457,43 +459,72 @@ void Simulation::compute_magenetic_force() {
     ident.resize(3 * num_particles, 3 * num_particles);
     ident.setIdentity();
     Eigen::SparseMatrix<double> A = G * Gamma - ident;
-    Eigen::ConjugateGradient<Eigen::SparseMatrix<double>> cg;
+    Eigen::LeastSquaresConjugateGradient<Eigen::SparseMatrix<double>> cg;
     cg.compute(A);
     b = cg.solve(-1.0 * hext);
     // b = cg.solve(-1.0 * hext);
     compute_m(b);
 
-    Eigen::Vector3d m_hat, ft;
-    Eigen::Matrix3d R, Ts, T_hat;
-    float q;
-    double dist;
     // for (size_t t = 0; t < num_particles; t++) {
     tbb::parallel_for<size_t>(0, num_particles, [&](size_t t) {
-        Eigen::Matrix3d U;
-        U.setZero();
-        Eigen::Vector3d rt, mt;
-        rt << pointers.particle_position[t][0], pointers.particle_position[t][1], pointers.particle_position[t][2];
-        mt << pointers.particle_mag_moment[t][0], pointers.particle_mag_moment[t][1],
-            pointers.particle_mag_moment[t][2];
+#if 0
+                Eigen::Vector3d m_hat, ft;
+                Eigen::Matrix3d R, Ts, T_hat;
+                float q;
+                double dist;
+                Eigen::Matrix3d U;
+                U.setZero();
+                Eigen::Vector3d rt, mt;
+                rt << pointers.particle_position[t][0], pointers.particle_position[t][1],
+                pointers.particle_position[t][2]; mt << pointers.particle_mag_moment[t][0],
+                pointers.particle_mag_moment[t][1],
+                    pointers.particle_mag_moment[t][2];
+                for (size_t s = 0; s < num_particles; s++) {
+                    Eigen::Vector3d rs, ms;
+                    rs << pointers.particle_position[s][0], pointers.particle_position[s][1],
+                    pointers.particle_position[s][2]; ms << pointers.particle_mag_moment[s][0],
+                    pointers.particle_mag_moment[s][1],
+                        pointers.particle_mag_moment[s][2];
+                    dist = (rt - rs).norm();
+                    if (dist < 4.0 * h) {
+                        q = dist / h;
+                        get_R(R, rt, rs); // note rs is the source!
+                        m_hat = R.transpose() * ms;
+                        get_T_hat(T_hat, m_hat, q);
+                        Ts = R * T_hat * R.transpose();
+                    } else {
+                        get_Force_Tensor(Ts, rt, rs, ms);
+                    }
+                    U += Ts;
+                }
+                ft = U * mt;
+                pointers.particle_mag_force[t] = vec3(ft[0], ft[1], ft[2]);
+#else
+        mat3 U(0.0);
+        auto rt = pointers.particle_position[t];
+        auto mt = pointers.particle_mag_moment[t];
         for (size_t s = 0; s < num_particles; s++) {
-            Eigen::Vector3d rs, ms;
-            rs << pointers.particle_position[s][0], pointers.particle_position[s][1], pointers.particle_position[s][2];
-            ms << pointers.particle_mag_moment[s][0], pointers.particle_mag_moment[s][1],
-                pointers.particle_mag_moment[s][2];
-            dist = (rt - rs).norm();
-            if (dist < 4.0 * h) {
-                q = dist / h;
-                get_R(R, rt, rs); // note rs is the source!
-                m_hat = R.transpose() * ms;
-                get_T_hat(T_hat, m_hat, q);
-                Ts = R * T_hat * R.transpose();
+            if (s == t)
+                continue;
+            auto rs = pointers.particle_position[s];
+            auto ms = pointers.particle_mag_moment[s];
+            float r = glm::length(rt - rs);
+            float q = r * (1 / h);
+            vec3 r_vec = rt - rs;
+            vec3 s_vec = ms;
+            mat3 Bij(0.0);
+            if (q > 4) {
+                get_far_field_force_tensor(Bij, r_vec, s_vec, q, h);
             } else {
-                get_Force_Tensor(Ts, rt, rs, ms);
+                get_near_field_force_tensor(Bij, r_vec, s_vec, q, h);
             }
-            U += Ts;
+            U += Bij;
         }
-        ft = U * mt;
-        pointers.particle_mag_force[t] = vec3(ft[0], ft[1], ft[2]);
+        auto ft = U * mt;
+        // ft += mu0 * mt 
+        pointers.particle_mag_force[t] = ft;
+// printf("%f\n", length(ft));
+#endif
     });
 }
 

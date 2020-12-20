@@ -13,9 +13,12 @@
 #include <memory>
 #include <vector>
 
+#pragma warning(disable : 4244)
+#pragma warning(disable : 4305)
 using glm::dvec3;
 using glm::ivec2;
 using glm::ivec3;
+using glm::mat3;
 using glm::vec2;
 using glm::vec3;
 // template <typename T, typename... Args>
@@ -45,8 +48,10 @@ using glm::vec3;
             abort();                                                                                                   \
         }                                                                                                              \
     }()
+static constexpr double pi = 3.1415926535897;
 class Simulation {
   public:
+    const double mu0 = 1.25663706212e-16;
     struct Cell {
         static constexpr size_t max_particles = 100;
         std::array<uint32_t, max_particles> particles;
