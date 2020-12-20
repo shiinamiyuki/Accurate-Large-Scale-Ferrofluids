@@ -168,7 +168,7 @@ vec3 Simulation::dvdt_tension_term(size_t id) {
         auto vab = va - vb;
         auto rab = ra - rb;
         if (length(rab) <= k * h) {
-            f += 100.0f * mass * mass * float(std::cos(3 * pi / (2 * k * h) * length(rab))) * rab;
+            f += 10000.0f * mass * mass * float(std::cos(3 * pi / (2 * k * h) * length(rab))) * rab;
         }
     }
     CHECK(!glm::any(glm::isnan(f)));
@@ -176,9 +176,9 @@ vec3 Simulation::dvdt_tension_term(size_t id) {
 }
 vec3 Simulation::dvdt_full(size_t id) {
     vec3 dvdt = vec3(0.0);
-    dvdt += dvdt_momentum_term(id);
-    dvdt += dvdt_viscosity_term(id);
-    dvdt += dvdt_tension_term(id);
+    // dvdt += dvdt_momentum_term(id);
+    // dvdt += dvdt_viscosity_term(id);
+    // dvdt += dvdt_tension_term(id);
     return dvdt;
 }
 
@@ -309,7 +309,12 @@ float Simulation::dWdr(vec3 r) {
     dW_r_h *= (1.0 / pow(h, 3));
     return dW_r_h;
 }
-
+dvec3 Simulation::Hext(dvec3 r) {
+    dvec3 m(0, 10, 0);
+    auto r_hat = normalize(r);
+    auto H = 1 / (4 * pi) * ((3.0 * r_hat * dot(m, r_hat) - m) / (std::pow(length(r), 3)));
+    return H;
+}
 void Simulation::eval_Hext() {
     // still need some thinking here
     // single point magnetic field
@@ -318,14 +323,29 @@ void Simulation::eval_Hext() {
     //     pointers.Hext[i] = vec3(1, 0, 0);
     // }
     // const double mu0 = 1.25663706212e-16;
-    dvec3 m(0, 100, 0);
 
     for (size_t i = 0; i < num_particles; i++) {
         dvec3 p = pointers.particle_position[i];
         dvec3 r = p - dipole;
-        auto r_hat = normalize(r);
-        auto H = 1 / (4 * pi) * ((3.0 * r_hat * dot(m, r_hat) - m) / (std::pow(length(r), 3)));
-        pointers.Hext[i] = vec3(H);
+        pointers.Hext[i] = Hext(r);
+    }
+}
+
+void Simulation::visualize_field(Eigen::MatrixXd &P, Eigen::MatrixXi &F) {
+    P.resize(2000, 3);
+    F.resize(1000, 2);
+    for (int x = 0; x < 10; x++) {
+        for (int y = 0; y < 10; y++) {
+            for (int z = 0; z < 10; z++) {
+                int idx = x + y * 10 + z * 100;
+                Eigen::Vector3d p(x, y, z);
+                p /= 10.0;
+                P.row(idx) = p;
+                auto h = Hext(dvec3(p[0], p[1], p[2]) - dipole);
+                P.row(idx + 1000) = p + Eigen::Vector3d(h[0], h[1], h[2]) * 0.01;
+                F.row(idx) = Eigen::RowVector2i(idx, idx + 1000);
+            }
+        }
     }
 }
 
@@ -433,6 +453,7 @@ void Simulation::magnetization() {
 }
 
 void Simulation::compute_magenetic_force() {
+    eval_Hext();
     Eigen::VectorXd hext(3 * num_particles), b;
     for (size_t i = 0; i < num_particles; i++) {
         hext.segment<3>(3 * i) << pointers.Hext[i][0], pointers.Hext[i][1], pointers.Hext[i][2];
@@ -467,38 +488,37 @@ void Simulation::compute_magenetic_force() {
 
     // for (size_t t = 0; t < num_particles; t++) {
     tbb::parallel_for<size_t>(0, num_particles, [&](size_t t) {
-#if 0
-                Eigen::Vector3d m_hat, ft;
-                Eigen::Matrix3d R, Ts, T_hat;
-                float q;
-                double dist;
-                Eigen::Matrix3d U;
-                U.setZero();
-                Eigen::Vector3d rt, mt;
-                rt << pointers.particle_position[t][0], pointers.particle_position[t][1],
-                pointers.particle_position[t][2]; mt << pointers.particle_mag_moment[t][0],
-                pointers.particle_mag_moment[t][1],
-                    pointers.particle_mag_moment[t][2];
-                for (size_t s = 0; s < num_particles; s++) {
-                    Eigen::Vector3d rs, ms;
-                    rs << pointers.particle_position[s][0], pointers.particle_position[s][1],
-                    pointers.particle_position[s][2]; ms << pointers.particle_mag_moment[s][0],
-                    pointers.particle_mag_moment[s][1],
-                        pointers.particle_mag_moment[s][2];
-                    dist = (rt - rs).norm();
-                    if (dist < 4.0 * h) {
-                        q = dist / h;
-                        get_R(R, rt, rs); // note rs is the source!
-                        m_hat = R.transpose() * ms;
-                        get_T_hat(T_hat, m_hat, q);
-                        Ts = R * T_hat * R.transpose();
-                    } else {
-                        get_Force_Tensor(Ts, rt, rs, ms);
-                    }
-                    U += Ts;
-                }
-                ft = U * mt;
-                pointers.particle_mag_force[t] = vec3(ft[0], ft[1], ft[2]);
+#if 1
+        Eigen::Vector3d m_hat, ft;
+        Eigen::Matrix3d R, Ts, T_hat;
+        float q;
+        double dist;
+        Eigen::Matrix3d U;
+        U.setZero();
+        Eigen::Vector3d rt, mt;
+        rt << pointers.particle_position[t][0], pointers.particle_position[t][1], pointers.particle_position[t][2];
+        mt << pointers.particle_mag_moment[t][0], pointers.particle_mag_moment[t][1],
+            pointers.particle_mag_moment[t][2];
+        for (size_t s = 0; s < num_particles; s++) {
+            Eigen::Vector3d rs, ms;
+            rs << pointers.particle_position[s][0], pointers.particle_position[s][1], pointers.particle_position[s][2];
+            ms << pointers.particle_mag_moment[s][0], pointers.particle_mag_moment[s][1],
+                pointers.particle_mag_moment[s][2];
+            dist = (rt - rs).norm();
+            if (dist < 4.0 * h) {
+                q = dist / h;
+                get_R(R, rt, rs); // note rs is the source!
+                m_hat = R.transpose() * ms;
+                get_T_hat(T_hat, m_hat, q);
+                Ts = R * T_hat * R.transpose();
+            } else {
+                get_Force_Tensor(Ts, rt, rs, ms);
+            }
+            U += Ts;
+        }
+        ft = U * mt;
+        // ft += mt * Eigen::Vector3d(pointers.Hext[t][0], pointers.Hext[t][1], pointers.Hext[t][2]);
+        pointers.particle_mag_force[t] = vec3(ft[0], ft[1], ft[2]);
 #else
         mat3 U(0.0);
         auto rt = pointers.particle_position[t];
@@ -530,7 +550,6 @@ void Simulation::compute_magenetic_force() {
 
 void Simulation::run_step_adami() {
     if (n_iter == 0) {
-        eval_Hext();
         tbb::parallel_for(size_t(0), num_particles, [=](size_t id) { pointers.particle_mag_force[id] = vec3(0); });
     }
     build_grid();

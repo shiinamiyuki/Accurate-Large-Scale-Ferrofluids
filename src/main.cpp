@@ -31,6 +31,9 @@ int main() {
         // }
     }
     Simulation sim(particles);
+    Eigen::MatrixXd PP;
+    Eigen::MatrixXi PI;
+    sim.visualize_field(PP, PI);
     bool flag = true;
     Eigen::MatrixXd P;
     P.resize(0, 3);
@@ -52,6 +55,7 @@ int main() {
     });
     using Viewer = igl::opengl::glfw::Viewer;
     igl::opengl::glfw::Viewer viewer;
+    viewer.data().set_edges(PP, PI, Eigen::Vector3d(1, 0.47, 0.45));
     viewer.callback_post_draw = [&](Viewer &) -> bool {
         std::unique_lock<std::mutex> lk(m);
         if (std::cv_status::no_timeout == cv.wait_for(lk, std::chrono::milliseconds(16))) {

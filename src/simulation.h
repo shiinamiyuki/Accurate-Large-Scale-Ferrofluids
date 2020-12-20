@@ -112,7 +112,7 @@ class Simulation {
     float susceptibility = 0.8; // material susceptibility
     float Gamma = pow(radius, 3) * (susceptibility / (1 + susceptibility));
     ivec3 grid_size;
-    dvec3 dipole = dvec3(0.5, -0.2, 0.5);
+    dvec3 dipole = dvec3(0.5, -0.5, 0.5);
     uint32_t get_index_i(const ivec3 &p) const { return p.x + p.y * grid_size.x + p.z * grid_size.x * grid_size.y; }
     ivec3 get_cell(const vec3 &p) const {
         ivec3 ip = p * vec3(grid_size);
@@ -161,4 +161,8 @@ class Simulation {
         }
     }
     void run_step();
+
+    void visualize_field(Eigen::MatrixXd& P, Eigen::MatrixXi & F);
+
+    dvec3 Hext(dvec3 r);
 };
