@@ -12,8 +12,8 @@ int main() {
     {
         std::random_device rd;
         std::uniform_real_distribution<float> dist;
-        for (float x = 0.4; x < 0.6; x += 0.02) {
-            for (float z = 0.4; z < 0.6; z += 0.02) {
+        for (float x = 0.3; x < 0.7; x += 0.02) {
+            for (float z = 0.3; z < 0.7; z += 0.02) {
                 for (float y = 0.0; y < 0.1; y += 0.01) {
                     particles.emplace_back(x, y, z);
                 }
@@ -32,10 +32,10 @@ int main() {
     }
     Simulation sim(particles);
     {
-        sim.lower.x = 0.4;
-        sim.lower.z = 0.4;
-        sim.upper.x = 0.6;
-        sim.upper.z = 0.6;
+        sim.lower.x = 0.3;
+        sim.lower.z = 0.3;
+        sim.upper.x = 0.7;
+        sim.upper.z = 0.7;
     }
     Eigen::MatrixXd PP;
     Eigen::MatrixXi PI;
@@ -61,7 +61,7 @@ int main() {
     });
     using Viewer = igl::opengl::glfw::Viewer;
     igl::opengl::glfw::Viewer viewer;
-    viewer.data().set_edges(PP, PI, Eigen::RowVector3d(1, 0.47, 0.45));
+    // viewer.data().set_edges(PP, PI, Eigen::RowVector3d(1, 0.47, 0.45));
     viewer.callback_post_draw = [&](Viewer &) -> bool {
         std::unique_lock<std::mutex> lk(m);
         if (std::cv_status::no_timeout == cv.wait_for(lk, std::chrono::milliseconds(16))) {
