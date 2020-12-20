@@ -12,9 +12,9 @@ int main() {
     {
         std::random_device rd;
         std::uniform_real_distribution<float> dist;
-        for (float x = 0.3; x < 0.7; x += 0.02) {
-            for (float z = 0.3; z < 0.7; z += 0.02) {
-                for (float y = 0.0; y < 0.1; y += 0.02) {
+        for (float x = 0.4; x < 0.6; x += 0.02) {
+            for (float z = 0.4; z < 0.6; z += 0.02) {
+                for (float y = 0.0; y < 0.1; y += 0.01) {
                     particles.emplace_back(x, y, z);
                 }
             }
@@ -31,6 +31,12 @@ int main() {
         // }
     }
     Simulation sim(particles);
+    {
+        sim.lower.x = 0.4;
+        sim.lower.z = 0.4;
+        sim.upper.x = 0.6;
+        sim.upper.z = 0.6;
+    }
     Eigen::MatrixXd PP;
     Eigen::MatrixXi PI;
     sim.visualize_field(PP, PI);

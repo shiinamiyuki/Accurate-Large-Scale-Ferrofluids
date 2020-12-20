@@ -126,6 +126,9 @@ class Simulation {
     }
     size_t n_iter = 0;
     size_t num_particles = 4000;
+
+    vec3 lower = vec3(0);
+    vec3 upper = vec3(1);
     void build_grid();
     void find_neighbors();
     vec3 dvdt_momentum_term(size_t id);

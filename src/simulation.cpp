@@ -130,7 +130,7 @@ vec3 Simulation::dvdt_momentum_term(size_t id) {
         CHECK(rho_a != 0.0);
         dvdt += -mass * (Pa / (rho_a * rho_a) + Pb / (rho_b * rho_b)) * gradW(ra - rb, dh);
     }
-    dvdt += gravity;
+    // dvdt += gravity;
     CHECK(!glm::any(glm::isnan(dvdt)));
     return dvdt;
 }
@@ -203,16 +203,16 @@ void Simulation::naive_collison_handling() {
     tbb::parallel_for(size_t(0), num_particles, [=](size_t id) {
         auto &p = pointers.particle_position[id];
         auto &v = pointers.particle_velocity[id];
-        auto k = 0.1;
+        auto k = 0.3;
         for (int i = 0; i < 3; i++) {
-            if (p[i] < 0.0) {
-                p[i] = 0.0;
+            if (p[i] < lower[i]) {
+                p[i] = lower[i];
                 if (v[i] < 0.0) {
                     v[i] += -(1 + k) * v[i];
                 }
             }
-            if (p[i] > 1.0) {
-                p[i] = 1.0;
+            if (p[i] > upper[i]) {
+                p[i] = upper[i];
                 if (v[i] > 0.0) {
                     v[i] += -(1 + k) * v[i];
                 }
@@ -676,7 +676,7 @@ void Simulation::get_Force_Tensor(Eigen::Matrix3d &Ts, const Eigen::Vector3d &rt
     vec3 r_for_W = vec3(r[0], r[1], r[2]);
     float r_norm = length(r_for_W);
     // CHECK(W(r_for_W) == 0.0);
-    CHECK(r_norm >= 4.0 * h);
+    // CHECK(r_norm >= 4.0 * h);
     auto W_avr_r = W_avr(r_for_W);
     auto W_r = 0.0; // W(r_for_W);
     float Ar = (W_avr_r - W_r) / (r_norm * r_norm);
