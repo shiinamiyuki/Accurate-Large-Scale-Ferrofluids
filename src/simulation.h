@@ -100,20 +100,20 @@ class Simulation {
     void init();
     float radius = 0.02f;
     float dh = radius * 1.3f;
-    float c0 = 20;
+    float c0 = 9.0;
     float rho0 = 1000;
     float gamma = 7;
     float kappa = 1.0;
-    float alpha = 0.5;
-    float dt = 0.0003;
+    float alpha = 0.04;
+    float dt = 0.0001;
     int size = 0;
     float mass = 0.0;
     float h = 2 * radius;       // kernel size
     float susceptibility = 0.8; // material susceptibility
     float Gamma = pow(radius, 3) * (susceptibility / (1 + susceptibility));
     ivec3 grid_size;
-    dvec3 dipole = dvec3(0.5, -0.5, 0.5);
-    dvec3 m = dvec3(0, 30000, 0);
+    dvec3 dipole = dvec3(0.5, -0.6, 0.5);
+    dvec3 m = dvec3(0, 10, 0);
     uint32_t get_index_i(const ivec3 &p) const { return p.x + p.y * grid_size.x + p.z * grid_size.x * grid_size.y; }
     ivec3 get_cell(const vec3 &p) const {
         ivec3 ip = p * vec3(grid_size);
