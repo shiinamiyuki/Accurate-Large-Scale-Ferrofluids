@@ -251,7 +251,7 @@ void Simulation::run_step_euler() {
 Eigen::Matrix3d Simulation::H_mat(vec3 r, vec3 m) {
     Eigen::Matrix3d mat;
     mat.setZero();
-    float r_norm = dot(r, r);
+    float r_norm = length(r);
     vec3 r_hat = normalize(r);
     if (r_norm == 0.0) {
         mat = Eigen::Matrix3d::Identity() * W(vec3(0)) / 3.0;
@@ -268,7 +268,7 @@ Eigen::Matrix3d Simulation::H_mat(vec3 r, vec3 m) {
     return mat;
 }
 vec3 Simulation::H(vec3 r, vec3 m) {
-    float r_norm = dot(r, r);
+    float r_norm = length(r);
     if (r_norm == 0.0) {
         return vec3(0);
     }
@@ -279,28 +279,33 @@ vec3 Simulation::H(vec3 r, vec3 m) {
 }
 
 float Simulation::W_avr(vec3 r) {
-    float r_norm = dot(r, r);
+    float r_norm = length(r);
     if (r_norm == 0.0) {
         return 0.0;
     }
     float W_r_h = 0.0;
     float q = r_norm / h;
+    auto q2 = q * q;
+    auto q3 = q2 * q;
+    auto q4 = q2 * q2;
+    auto q5 = q3 * q2;
+    auto q6 = q3 * q3;
     if (0 <= q && q < 1) {
-        W_r_h = (1.0 / 40.0) * (15.0 * pow(q, 3) - 36 * pow(q, 2) + 40.0);
+        W_r_h = (1.0 / 40.0) * (15.0 * q3 - 36 * q2 + 40.0);
     } else if (1 <= q && q < 2) {
-        W_r_h = (-3.0 / (4.0 * pow(q, 3))) *
-                (pow(q, 6) / 6.0 - (6.0 * pow(q, 5)) / 5.0 + 3.0 * pow(q, 4) - (8.0 * pow(q, 3)) / 3.0 + 1.0 / 15.0);
+        W_r_h = (-3.0 / (4.0 *q3)) *
+                (q6 / 6.0 - (6.0 * q5) / 5.0 + 3.0 * pow(q, 4) - (8.0 * q3) / 3.0 + 1.0 / 15.0);
     } else {
-        W_r_h = 3.0 / (4.0 * pow(q, 3));
+        W_r_h = 3.0 / (4.0 * q3);
     }
     W_r_h *= (1.0 / pi);
-    W_r_h *= (1.0 / pow(h, 3));
+    W_r_h *= (1.0 / (h * h * h));
     CHECK(!std::isnan(W_r_h));
     return W_r_h;
 }
 
 float Simulation::W(vec3 r) {
-    float r_norm = dot(r, r);
+    float r_norm = length(r);
     float W_r_h = 0.0;
     float q = r_norm / h;
     if (0 <= q && q < 1) {
@@ -310,23 +315,24 @@ float Simulation::W(vec3 r) {
         W_r_h = 0.25 * pow((2.0 - q), 3);
     }
     W_r_h *= (1.0 / pi);
-    W_r_h *= (1.0 / pow(h, 3));
+    W_r_h *= (1.0 / (h * h * h));
     CHECK(!std::isnan(W_r_h));
     return W_r_h;
 }
 
 float Simulation::dWdr(vec3 r) {
-    float r_norm = dot(r, r);
+    float r_norm = length(r);
     float dW_r_h = 0.0;
     float q = r_norm / h;
+    auto q2 = q * q;
     if (0 <= q && q < 1) {
-        dW_r_h = 2.25 * pow(q, 2) - 3.0 * q;
+        dW_r_h = 2.25 * q2 - 3.0 * q;
     }
     if (1 <= q && q < 2) {
-        dW_r_h = -0.75 * pow(q, 2) + 3.0 * q - 3.0;
+        dW_r_h = -0.75 * q2 + 3.0 * q - 3.0;
     }
     dW_r_h *= (1.0 / pi);
-    dW_r_h *= (1.0 / pow(h, 3));
+    dW_r_h *= (1.0 / (h * h * h));
     return dW_r_h;
 }
 mat3 Simulation::dHext(dvec3 r) {
@@ -668,13 +674,23 @@ void Simulation::get_Force_Tensor(Eigen::Matrix3d &Ts, const Eigen::Vector3d &rt
                                   const Eigen::Vector3d &ms) {
     Eigen::Vector3d r = rt - rs;
     vec3 r_for_W = vec3(r[0], r[1], r[2]);
-    float r_norm = dot(r_for_W, r_for_W);
-    float Ar = (W_avr(r_for_W) - W(r_for_W)) / pow(r_norm, 2);
-    float Ar_prime =
-        (5 * W(r_for_W)) / pow(r_norm, 3) - (5 * W_avr(r_for_W)) / pow(r_norm, 3) - dWdr(r_for_W) / pow(r_norm, 2);
+    float r_norm = length(r_for_W);
+    // CHECK(W(r_for_W) == 0.0);
+    CHECK(r_norm >= 4.0 * h);
+    auto W_avr_r = W_avr(r_for_W);
+    auto W_r = 0.0; // W(r_for_W);
+    float Ar = (W_avr_r - W_r) / (r_norm * r_norm);
+    float Ar_prime = (5 * W_r) / (r_norm * r_norm * r_norm) - (5 * W_avr_r) / (r_norm * r_norm * r_norm) -
+                     dWdr(r_for_W) / (r_norm * r_norm);
     Ts = (Eigen::Matrix3d::Identity() * (r.transpose() * ms) + r * ms.transpose() + ms * r.transpose()) * Ar +
          r * (r.transpose() * ms) * (r.transpose() / r_norm) * Ar_prime;
     // Ts *= mu0;
+}
+
+void my_far_force_tensor(glm::mat3 &Bij, const glm::vec3 &r_vec, const glm::vec3 &s_vec, const float &q,
+                         const float &h) {
+    //
+    // Bij = I dot(r, m) A + rm' A + rr' dAdr - mr' dBdr
 }
 
 void Simulation::compute_m(const Eigen::VectorXd &b) {
@@ -757,7 +773,7 @@ void Simulation::compute_magenetic_force() {
     // std::cout << b << std::endl;
     // for (size_t t = 0; t < num_particles; t++) {
     tbb::parallel_for<size_t>(0, num_particles, [&](size_t t) {
-#if 0
+#if 1
         Eigen::Vector3d m_hat, ft;
         Eigen::Matrix3d R, Ts, T_hat;
 
@@ -782,7 +798,7 @@ void Simulation::compute_magenetic_force() {
                 m_hat = R.transpose() * ms;
                 get_T_hat(T_hat, m_hat, q);
                 Ts = R * T_hat * R.transpose(); // * 10000000.0;
-                std::cout << Ts << std::endl;
+                // std::cout << Ts << std::endl;
             } else {
                 get_Force_Tensor(Ts, rt, rs, ms);
                 // Ts *= 0.1;
