@@ -113,6 +113,7 @@ class Simulation {
     float Gamma = pow(radius, 3) * (susceptibility / (1 + susceptibility));
     ivec3 grid_size;
     dvec3 dipole = dvec3(0.5, -0.5, 0.5);
+    dvec3 m = dvec3(0, 10, 0);
     uint32_t get_index_i(const ivec3 &p) const { return p.x + p.y * grid_size.x + p.z * grid_size.x * grid_size.y; }
     ivec3 get_cell(const vec3 &p) const {
         ivec3 ip = p * vec3(grid_size);
@@ -135,6 +136,7 @@ class Simulation {
     void naive_collison_handling();
     float P(size_t id);
     vec3 H(vec3 r, vec3 m);
+    Eigen::Matrix3d H_mat(vec3 r, vec3 m);
     float W_avr(vec3 r);
     float W(vec3 r);
     float dWdr(vec3 r);
@@ -162,7 +164,8 @@ class Simulation {
     }
     void run_step();
 
-    void visualize_field(Eigen::MatrixXd& P, Eigen::MatrixXi & F);
+    void visualize_field(Eigen::MatrixXd &P, Eigen::MatrixXi &F);
 
     dvec3 Hext(dvec3 r);
+    mat3 dHext(dvec3 r);
 };

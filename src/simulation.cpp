@@ -2,6 +2,7 @@
 #include "original.h"
 #include <Eigen/Core>
 #include <Eigen/Sparse>
+#include <iostream>
 #include <tbb/parallel_for.h>
 
 // https://github.com/erizmr/SPH_Taichi
@@ -176,9 +177,9 @@ vec3 Simulation::dvdt_tension_term(size_t id) {
 }
 vec3 Simulation::dvdt_full(size_t id) {
     vec3 dvdt = vec3(0.0);
-    // dvdt += dvdt_momentum_term(id);
-    // dvdt += dvdt_viscosity_term(id);
-    // dvdt += dvdt_tension_term(id);
+    dvdt += dvdt_momentum_term(id);
+    dvdt += dvdt_viscosity_term(id);
+    dvdt += dvdt_tension_term(id);
     return dvdt;
 }
 
@@ -247,6 +248,24 @@ void Simulation::run_step_euler() {
     // printf("step done\n");
 }
 
+Eigen::Matrix3d Simulation::H_mat(vec3 r, vec3 m) {
+    Eigen::Matrix3d mat;
+    mat.setZero();
+    float r_norm = dot(r, r);
+    vec3 r_hat = normalize(r);
+    if (r_norm == 0.0) {
+        mat = Eigen::Matrix3d::Identity() * W(vec3(0)) / 3.0;
+    } else {
+        mat += Eigen::Matrix3d::Identity() * W_avr(r) / 3.0;
+        auto k = W_avr(r) - W(r);
+        Eigen::Matrix3d A;
+        A << r_hat[0] * r_hat[0], r_hat[0] * r_hat[1], r_hat[0] * r_hat[1], // .
+            r_hat[1] * r_hat[0], r_hat[1] * r_hat[1], r_hat[1] * r_hat[1],  // .
+            r_hat[2] * r_hat[0], r_hat[2] * r_hat[1], r_hat[2] * r_hat[1];  // .
+        mat += k * A;
+    }
+    return mat;
+}
 vec3 Simulation::H(vec3 r, vec3 m) {
     float r_norm = dot(r, r);
     if (r_norm == 0.0) {
@@ -309,8 +328,231 @@ float Simulation::dWdr(vec3 r) {
     dW_r_h *= (1.0 / pow(h, 3));
     return dW_r_h;
 }
+mat3 Simulation::dHext(dvec3 r) {
+    if (dot(r, r) == 0.0) {
+        return mat3(0.0);
+    }
+    auto m1 = m[0];
+    auto m2 = m[1];
+    auto m3 = m[2];
+    auto r1 = r[0];
+    auto r2 = r[1];
+    auto r3 = r[2];
+    glm::dmat3 T;
+    T[0][0] = -((m1 * r1 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                 m2 * r2 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                 m3 * r3 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0))) *
+                    1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) * -3.0 +
+                r1 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) *
+                    (-m1 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                     m1 * r1 * fabs(r1) * ((r1 / fabs(r1))) * 1.0 /
+                         pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) +
+                     m2 * r2 * fabs(r1) * ((r1 / fabs(r1))) * 1.0 /
+                         pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) +
+                     m3 * r3 * fabs(r1) * ((r1 / fabs(r1))) * 1.0 /
+                         pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0)) *
+                    3.0 +
+                r1 * fabs(r1) * ((r1 / fabs(r1))) *
+                    (m1 * r1 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                     m2 * r2 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                     m3 * r3 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0))) *
+                    1.0 / pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) * 3.0) *
+                  1.0 / pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) +
+              fabs(r1) * ((r1 / fabs(r1))) *
+                  (m1 - r1 *
+                            (m1 * r1 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                             m2 * r2 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                             m3 * r3 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0))) *
+                            1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) * 3.0) *
+                  1.0 / pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 5.0 / 2.0) * 3.0;
+    T[0][1] = -(r1 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) *
+                    (-m2 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                     m1 * r1 * fabs(r2) * ((r2 / fabs(r2))) * 1.0 /
+                         pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) +
+                     m2 * r2 * fabs(r2) * ((r2 / fabs(r2))) * 1.0 /
+                         pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) +
+                     m3 * r3 * fabs(r2) * ((r2 / fabs(r2))) * 1.0 /
+                         pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0)) *
+                    3.0 +
+                r1 * fabs(r2) * ((r2 / fabs(r2))) *
+                    (m1 * r1 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                     m2 * r2 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                     m3 * r3 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0))) *
+                    1.0 / pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) * 3.0) *
+                  1.0 / pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) +
+              fabs(r2) * ((r2 / fabs(r2))) *
+                  (m1 - r1 *
+                            (m1 * r1 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                             m2 * r2 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                             m3 * r3 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0))) *
+                            1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) * 3.0) *
+                  1.0 / pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 5.0 / 2.0) * 3.0;
+    T[0][2] = -(r1 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) *
+                    (-m3 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                     m1 * r1 * fabs(r3) * ((r3 / fabs(r3))) * 1.0 /
+                         pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) +
+                     m2 * r2 * fabs(r3) * ((r3 / fabs(r3))) * 1.0 /
+                         pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) +
+                     m3 * r3 * fabs(r3) * ((r3 / fabs(r3))) * 1.0 /
+                         pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0)) *
+                    3.0 +
+                r1 * fabs(r3) * ((r3 / fabs(r3))) *
+                    (m1 * r1 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                     m2 * r2 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                     m3 * r3 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0))) *
+                    1.0 / pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) * 3.0) *
+                  1.0 / pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) +
+              fabs(r3) * ((r3 / fabs(r3))) *
+                  (m1 - r1 *
+                            (m1 * r1 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                             m2 * r2 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                             m3 * r3 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0))) *
+                            1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) * 3.0) *
+                  1.0 / pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 5.0 / 2.0) * 3.0;
+    T[1][0] = -(r2 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) *
+                    (-m1 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                     m1 * r1 * fabs(r1) * ((r1 / fabs(r1))) * 1.0 /
+                         pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) +
+                     m2 * r2 * fabs(r1) * ((r1 / fabs(r1))) * 1.0 /
+                         pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) +
+                     m3 * r3 * fabs(r1) * ((r1 / fabs(r1))) * 1.0 /
+                         pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0)) *
+                    3.0 +
+                r2 * fabs(r1) * ((r1 / fabs(r1))) *
+                    (m1 * r1 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                     m2 * r2 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                     m3 * r3 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0))) *
+                    1.0 / pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) * 3.0) *
+                  1.0 / pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) +
+              fabs(r1) * ((r1 / fabs(r1))) *
+                  (m2 - r2 *
+                            (m1 * r1 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                             m2 * r2 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                             m3 * r3 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0))) *
+                            1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) * 3.0) *
+                  1.0 / pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 5.0 / 2.0) * 3.0;
+    T[1][1] = -((m1 * r1 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                 m2 * r2 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                 m3 * r3 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0))) *
+                    1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) * -3.0 +
+                r2 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) *
+                    (-m2 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                     m1 * r1 * fabs(r2) * ((r2 / fabs(r2))) * 1.0 /
+                         pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) +
+                     m2 * r2 * fabs(r2) * ((r2 / fabs(r2))) * 1.0 /
+                         pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) +
+                     m3 * r3 * fabs(r2) * ((r2 / fabs(r2))) * 1.0 /
+                         pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0)) *
+                    3.0 +
+                r2 * fabs(r2) * ((r2 / fabs(r2))) *
+                    (m1 * r1 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                     m2 * r2 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                     m3 * r3 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0))) *
+                    1.0 / pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) * 3.0) *
+                  1.0 / pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) +
+              fabs(r2) * ((r2 / fabs(r2))) *
+                  (m2 - r2 *
+                            (m1 * r1 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                             m2 * r2 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                             m3 * r3 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0))) *
+                            1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) * 3.0) *
+                  1.0 / pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 5.0 / 2.0) * 3.0;
+    T[1][2] = -(r2 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) *
+                    (-m3 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                     m1 * r1 * fabs(r3) * ((r3 / fabs(r3))) * 1.0 /
+                         pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) +
+                     m2 * r2 * fabs(r3) * ((r3 / fabs(r3))) * 1.0 /
+                         pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) +
+                     m3 * r3 * fabs(r3) * ((r3 / fabs(r3))) * 1.0 /
+                         pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0)) *
+                    3.0 +
+                r2 * fabs(r3) * ((r3 / fabs(r3))) *
+                    (m1 * r1 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                     m2 * r2 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                     m3 * r3 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0))) *
+                    1.0 / pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) * 3.0) *
+                  1.0 / pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) +
+              fabs(r3) * ((r3 / fabs(r3))) *
+                  (m2 - r2 *
+                            (m1 * r1 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                             m2 * r2 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                             m3 * r3 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0))) *
+                            1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) * 3.0) *
+                  1.0 / pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 5.0 / 2.0) * 3.0;
+    T[2][0] = -(r3 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) *
+                    (-m1 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                     m1 * r1 * fabs(r1) * ((r1 / fabs(r1))) * 1.0 /
+                         pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) +
+                     m2 * r2 * fabs(r1) * ((r1 / fabs(r1))) * 1.0 /
+                         pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) +
+                     m3 * r3 * fabs(r1) * ((r1 / fabs(r1))) * 1.0 /
+                         pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0)) *
+                    3.0 +
+                r3 * fabs(r1) * ((r1 / fabs(r1))) *
+                    (m1 * r1 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                     m2 * r2 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                     m3 * r3 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0))) *
+                    1.0 / pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) * 3.0) *
+                  1.0 / pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) +
+              fabs(r1) * ((r1 / fabs(r1))) *
+                  (m3 - r3 *
+                            (m1 * r1 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                             m2 * r2 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                             m3 * r3 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0))) *
+                            1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) * 3.0) *
+                  1.0 / pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 5.0 / 2.0) * 3.0;
+    T[2][1] = -(r3 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) *
+                    (-m2 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                     m1 * r1 * fabs(r2) * ((r2 / fabs(r2))) * 1.0 /
+                         pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) +
+                     m2 * r2 * fabs(r2) * ((r2 / fabs(r2))) * 1.0 /
+                         pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) +
+                     m3 * r3 * fabs(r2) * ((r2 / fabs(r2))) * 1.0 /
+                         pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0)) *
+                    3.0 +
+                r3 * fabs(r2) * ((r2 / fabs(r2))) *
+                    (m1 * r1 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                     m2 * r2 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                     m3 * r3 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0))) *
+                    1.0 / pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) * 3.0) *
+                  1.0 / pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) +
+              fabs(r2) * ((r2 / fabs(r2))) *
+                  (m3 - r3 *
+                            (m1 * r1 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                             m2 * r2 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                             m3 * r3 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0))) *
+                            1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) * 3.0) *
+                  1.0 / pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 5.0 / 2.0) * 3.0;
+    T[2][2] = -((m1 * r1 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                 m2 * r2 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                 m3 * r3 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0))) *
+                    1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) * -3.0 +
+                r3 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) *
+                    (-m3 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                     m1 * r1 * fabs(r3) * ((r3 / fabs(r3))) * 1.0 /
+                         pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) +
+                     m2 * r2 * fabs(r3) * ((r3 / fabs(r3))) * 1.0 /
+                         pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) +
+                     m3 * r3 * fabs(r3) * ((r3 / fabs(r3))) * 1.0 /
+                         pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0)) *
+                    3.0 +
+                r3 * fabs(r3) * ((r3 / fabs(r3))) *
+                    (m1 * r1 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                     m2 * r2 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                     m3 * r3 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0))) *
+                    1.0 / pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) * 3.0) *
+                  1.0 / pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 3.0 / 2.0) +
+              fabs(r3) * ((r3 / fabs(r3))) *
+                  (m3 - r3 *
+                            (m1 * r1 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                             m2 * r2 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) +
+                             m3 * r3 * 1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0))) *
+                            1.0 / sqrt(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0)) * 3.0) *
+                  1.0 / pow(pow(fabs(r1), 2.0) + pow(fabs(r2), 2.0) + pow(fabs(r3), 2.0), 5.0 / 2.0) * 3.0;
+    return T;
+}
 dvec3 Simulation::Hext(dvec3 r) {
-    dvec3 m(0, 10, 0);
+
     auto r_hat = normalize(r);
     auto H = 1 / (4 * pi) * ((3.0 * r_hat * dot(m, r_hat) - m) / (std::pow(length(r), 3)));
     return H;
@@ -444,6 +686,8 @@ void Simulation::magnetization() {
         pointers.particle_H[t] = vec3(0.0f, 0.0f, 0.0f);
         pointers.particle_M[t] = vec3(0.0f, 0.0f, 0.0f);
         for (size_t s = 0; s < num_particles; s++) {
+            if (t == s)
+                continue;
             pointers.particle_H[t] +=
                 H(pointers.particle_position[t] - pointers.particle_position[s], pointers.particle_mag_moment[s]);
             pointers.particle_M[t] +=
@@ -458,39 +702,60 @@ void Simulation::compute_magenetic_force() {
     for (size_t i = 0; i < num_particles; i++) {
         hext.segment<3>(3 * i) << pointers.Hext[i][0], pointers.Hext[i][1], pointers.Hext[i][2];
     }
-    magnetization();
+#if 0
+    // magnetization();
     Eigen::SparseMatrix<double> G;
     G.resize(3 * num_particles, 3 * num_particles);
+    // G.setZero();
     std::vector<Eigen::Triplet<double>> trip;
-    for (size_t j = 0; j < num_particles; j++) {
-        // dvec3 r(pointers.particle_position[j][0], pointers.particle_position[j][1],
-        // pointers.particle_position[j][2]); r -= dipole; trip.push_back(Eigen::Triplet<double>(3 * j, 3 * j,
-        // pointers.particle_position[j][0])); trip.push_back(Eigen::Triplet<double>(3 * j + 1, 3 * j + 1,
-        // pointers.particle_position[j][1])); trip.push_back(Eigen::Triplet<double>(3 * j + 2, 3 * j + 2,
-        // pointers.particle_position[j][2])); for (int k = 0; k < 3; k++) {
-        //     trip.emplace_back(3 * k, 3 * k, r[k]);
-        // }
-        for (int k = 0; k < 3; k++) {
-            trip.emplace_back(3 * j + k, 3 * j + k, pointers.particle_H[j][k] + pointers.particle_M[j][k]);
+    for (size_t i = 0; i < num_particles; i++) {
+        vec3 ri = pointers.particle_position[i];
+        for (size_t j = 0; j < num_particles; j++) {
+            vec3 rj = pointers.particle_position[j];
+            rj -= vec3(dipole);
+            vec3 r = ri - rj;
+            vec3 mj = pointers.particle_mag_moment[j];
+            //   trip.push_back(Eigen::Triplet<double>(3 * j, 3 * j,
+            // pointers.particle_position[j][0])); trip.push_back(Eigen::Triplet<double>(3 * j + 1, 3 * j + 1,
+            // pointers.particle_position[j][1])); trip.push_back(Eigen::Triplet<double>(3 * j + 2, 3 * j + 2,
+            // pointers.particle_position[j][2])); for (int k = 0; k < 3; k++) {
+            //     trip.emplace_back(3 * k, 3 * k, r[k]);
+            // }
+            // for (int k = 0; k < 3; k++) {
+            //     trip.emplace_back(3 * j + k, 3 * j + k, pointers.particle_H[j][k] + pointers.particle_M[j][k]);
+            // }
+            Eigen::Matrix3d Hi = H_mat(r, mj);
+            // std::cout << Hi << std::endl;
+            for (int a = 0; a < 3; a++) {
+                for (int b = 0; b < 3; b++) {
+                    trip.emplace_back(3 * j + a, 3 * j + b, Hi(a, b) + W(r));
+                }
+            }
         }
     }
-
+    
     G.setFromTriplets(trip.begin(), trip.end());
-    Eigen::SparseMatrix<double> ident;
+   atrix<double> ident;
     ident.resize(3 * num_particles, 3 * num_particles);
     ident.setIdentity();
     Eigen::SparseMatrix<double> A = G * Gamma - ident;
     Eigen::LeastSquaresConjugateGradient<Eigen::SparseMatrix<double>> cg;
     cg.compute(A);
+    
     b = cg.solve(-1.0 * hext);
+    printf("%lf\n", b.norm());
     // b = cg.solve(-1.0 * hext);
-    compute_m(b);
 
+#endif
+    b = hext;
+    compute_m(b);
+    // std::cout << b << std::endl;
     // for (size_t t = 0; t < num_particles; t++) {
     tbb::parallel_for<size_t>(0, num_particles, [&](size_t t) {
 #if 1
         Eigen::Vector3d m_hat, ft;
         Eigen::Matrix3d R, Ts, T_hat;
+
         float q;
         double dist;
         Eigen::Matrix3d U;
@@ -500,6 +765,7 @@ void Simulation::compute_magenetic_force() {
         mt << pointers.particle_mag_moment[t][0], pointers.particle_mag_moment[t][1],
             pointers.particle_mag_moment[t][2];
         for (size_t s = 0; s < num_particles; s++) {
+            Ts.setZero();
             Eigen::Vector3d rs, ms;
             rs << pointers.particle_position[s][0], pointers.particle_position[s][1], pointers.particle_position[s][2];
             ms << pointers.particle_mag_moment[s][0], pointers.particle_mag_moment[s][1],
@@ -513,12 +779,16 @@ void Simulation::compute_magenetic_force() {
                 Ts = R * T_hat * R.transpose();
             } else {
                 get_Force_Tensor(Ts, rt, rs, ms);
+                // Ts *= 0.01;
+                // // Ts *= mu0 * 1e6;
+                Ts *= -0.03;
             }
             U += Ts;
         }
         ft = U * mt;
-        // ft += mt * Eigen::Vector3d(pointers.Hext[t][0], pointers.Hext[t][1], pointers.Hext[t][2]);
-        pointers.particle_mag_force[t] = vec3(ft[0], ft[1], ft[2]);
+        vec3 F = vec3(ft[0], ft[1], ft[2]);
+        F += dHext(dvec3(pointers.particle_position[t]) - dipole) * vec3(mt[0], mt[1], mt[2]);
+        pointers.particle_mag_force[t] = F;
 #else
         mat3 U(0.0);
         auto rt = pointers.particle_position[t];
@@ -540,7 +810,7 @@ void Simulation::compute_magenetic_force() {
             }
             U += Bij;
         }
-        auto ft = U * mt;
+        auto ft = U * mt +  dHext(dvec3(pointers.particle_position[t]) - dipole) * mt;
         // ft += mu0 * mt 
         pointers.particle_mag_force[t] = ft;
 // printf("%f\n", length(ft));
