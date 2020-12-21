@@ -587,20 +587,53 @@ void Simulation::eval_Hext() {
 }
 
 void Simulation::visualize_field(Eigen::MatrixXd &P, Eigen::MatrixXi &F) {
-    P.resize(2000, 3);
-    F.resize(1000, 2);
+    // P.resize(2000, 3);
+    // F.resize(1000, 2);
+    // for (int x = 0; x < 10; x++) {
+    //     for (int y = 0; y < 10; y++) {
+    //         for (int z = 0; z < 10; z++) {
+    //             int idx = x + y * 10 + z * 100;
+    //             Eigen::Vector3d p(x, y, z);
+    //             p /= 10.0;
+    //             P.row(idx) = p;
+    //             auto h = Hext(dvec3(p[0], p[1], p[2]) - dipole);
+    //             P.row(idx + 1000) = p + Eigen::Vector3d(h[0], h[1], h[2]).normalized() * 0.04;
+    //             F.row(idx) = Eigen::RowVector2i(idx, idx + 1000);
+    //         }
+    //     }
+    // }
+    std::vector<std::pair<vec3, vec3>> segments;
     for (int x = 0; x < 10; x++) {
-        for (int y = 0; y < 10; y++) {
-            for (int z = 0; z < 10; z++) {
-                int idx = x + y * 10 + z * 100;
-                Eigen::Vector3d p(x, y, z);
-                p /= 10.0;
-                P.row(idx) = p;
-                auto h = Hext(dvec3(p[0], p[1], p[2]) - dipole);
-                P.row(idx + 1000) = p + Eigen::Vector3d(h[0], h[1], h[2]).normalized() * 0.04;
-                F.row(idx) = Eigen::RowVector2i(idx, idx + 1000);
+        for (int z = 0; z < 10; z++) {
+            vec3 p(x, 0.0, z);
+            p /= 10.0f;
+            auto q = p;
+            auto q0 = q;
+            for (int i = 0; i < 20; i++) {
+                for (int j = 0; j < 10; j++) {
+                    q += normalize(Hext(dvec3(q) - dipole)) * 0.005;
+                }
+                segments.emplace_back(q0, q);
+                q0 = q;
+            }
+            q0 = p;
+            q = p;
+            for (int i = 0; i < 20; i++) {
+                for (int j = 0; j < 10; j++) {
+                    q += -normalize(Hext(dvec3(q) - dipole)) * 0.005;
+                }
+                segments.emplace_back(q0, q);
+                q0 = q;
             }
         }
+    }
+    P.resize(segments.size() * 2, 3);
+    F.resize(segments.size(), 2);
+    for (size_t i = 0; i < segments.size(); i++) {
+        P.row(2 * i) = Eigen::Vector3d(segments[i].first[0], segments[i].first[1], segments[i].first[2]);
+        P.row(2 * i + 1) = Eigen::Vector3d(segments[i].second[0], segments[i].second[1], segments[i].second[2]);
+        F(i, 0) = 2 * i;
+        F(i, 1) = 2 * i + 1;
     }
 }
 

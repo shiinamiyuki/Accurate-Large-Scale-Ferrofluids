@@ -9,7 +9,7 @@ using glm::vec2;
 using glm::vec3;
 
 // Code from author
-// Mostly for debugging purpose
+// Only for debugging purpose and are not used in our experimeents
 // https://github.com/ureternalreward/magnetic-force/blob/master/magnetic_solver/magnetic_force.cu
 
 #define DEF_POLY4_FUNC_naive(_FUNCNAME, ARG1, ARG2, ARG3, ARG4, ARG5)                                                  \
