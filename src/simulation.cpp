@@ -687,12 +687,6 @@ void Simulation::get_Force_Tensor(Eigen::Matrix3d &Ts, const Eigen::Vector3d &rt
     // Ts *= mu0;
 }
 
-void my_far_force_tensor(glm::mat3 &Bij, const glm::vec3 &r_vec, const glm::vec3 &s_vec, const float &q,
-                         const float &h) {
-    //
-    // Bij = I dot(r, m) A + rm' A + rr' dAdr - mr' dBdr
-}
-
 void Simulation::compute_m(const Eigen::VectorXd &b) {
     Eigen::VectorXd Gamma_b = Gamma * b;
     for (size_t i = 0; i < num_particles; i++) {

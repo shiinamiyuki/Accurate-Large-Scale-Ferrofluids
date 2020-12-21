@@ -169,8 +169,8 @@ int main(int argc, char **argv) {
         }
     }
 
-    std::condition_variable cv;
     std::atomic_bool run_sim = true;
+    std::atomic_bool sim_ready = false;
 
     // auto sim = setup_ferror_success();
     auto sim = setup_sph_wave_impact();
@@ -182,7 +182,6 @@ int main(int argc, char **argv) {
     bool flag = true;
     Eigen::MatrixXd P;
     P.resize(0, 3);
-    std::mutex m;
     std::mutex sim_lk;
 
     auto write_obj = [&] {
@@ -224,25 +223,17 @@ int main(int argc, char **argv) {
         os << "sim-" << result << "-iter-" << sim.n_iter << ".obj";
         igl::writeOBJ(os.str(), V, F);
     };
+    P.resize(sim.buffers.num_particles, 3);
     std::thread sim_thd([&] {
-        std::unique_lock<std::mutex> lk(m, std::defer_lock);
         while (flag) {
             if (!run_sim) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             } else {
                 {
-                    std::lock_guard<std::mutex> lk2(sim_lk);
+                    std::lock_guard<std::mutex> lk(sim_lk);
                     sim.run_step();
+                    sim_ready = true;
                 }
-                lk.lock();
-                P.resize(sim.buffers.num_particles, 3);
-                for (size_t i = 0; i < sim.buffers.num_particles; i++) {
-                    auto p = sim.buffers.particle_position[i];
-                    // printf("%f %f %f\n", p.x, p.y, p.z);
-                    P.row(i) = Eigen::RowVector3d(p.x, p.y, p.z);
-                }
-                lk.unlock();
-                cv.notify_one();
                 if (write_obj_sequence && sim.n_iter % 100 == 0) {
                     write_obj_seq(sim.n_iter);
                 }
@@ -254,8 +245,12 @@ int main(int argc, char **argv) {
     igl::opengl::glfw::Viewer viewer;
     // viewer.data().set_edges(PP, PI, Eigen::RowVector3d(1, 0.47, 0.45));
     viewer.callback_post_draw = [&](Viewer &) -> bool {
-        std::unique_lock<std::mutex> lk(m);
-        if (std::cv_status::no_timeout == cv.wait_for(lk, std::chrono::milliseconds(16))) {
+        if (sim_ready) {
+            sim_ready = false;
+            for (size_t i = 0; i < sim.buffers.num_particles; i++) {
+                auto p = sim.buffers.particle_position[i];
+                P.row(i) = Eigen::RowVector3d(p.x, p.y, p.z);
+            }
             viewer.data().point_size = 5;
             viewer.data().set_points(P, Eigen::RowVector3d(1, 1, 1));
         }
@@ -264,7 +259,7 @@ int main(int argc, char **argv) {
     viewer.callback_key_pressed = [&](Viewer &, unsigned int key, int) -> bool {
         if (key == ' ') {
             run_sim = !run_sim;
-        } else if (key == 'b') {
+        } else if (key == 's') {
             write_obj();
         }
         return false;
