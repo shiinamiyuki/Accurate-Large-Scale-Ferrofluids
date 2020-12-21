@@ -716,6 +716,8 @@ void Simulation::magnetization() {
 }
 
 void Simulation::compute_magenetic_force() {
+    if (!enable_ferro)
+        return;
     eval_Hext();
     Eigen::VectorXd hext(3 * num_particles), b;
     for (size_t i = 0; i < num_particles; i++) {
@@ -811,28 +813,33 @@ void Simulation::compute_magenetic_force() {
         rt << pointers.particle_position[t][0], pointers.particle_position[t][1], pointers.particle_position[t][2];
         mt << pointers.particle_mag_moment[t][0], pointers.particle_mag_moment[t][1],
             pointers.particle_mag_moment[t][2];
-        for (size_t s = 0; s < num_particles; s++) {
-            Ts.setZero();
-            Eigen::Vector3d rs, ms;
-            rs << pointers.particle_position[s][0], pointers.particle_position[s][1], pointers.particle_position[s][2];
-            ms << pointers.particle_mag_moment[s][0], pointers.particle_mag_moment[s][1],
-                pointers.particle_mag_moment[s][2];
-            dist = (rt - rs).norm();
-            if (dist < 4.0 * h) {
-                q = dist / h;
-                get_R(R, rt, rs); // note rs is the source!
-                m_hat = R.transpose() * ms;
-                get_T_hat(T_hat, m_hat, q);
-                Ts = R * T_hat * R.transpose(); // * 10000000.0;
-                // std::cout << Ts << std::endl;
-            } else {
-                get_Force_Tensor(Ts, rt, rs, ms);
-                // Ts *= 0.1;
-                Ts *= mu0;
+        if (enable_interparticle_force) {
+            for (size_t s = 0; s < num_particles; s++) {
+                Ts.setZero();
+                Eigen::Vector3d rs, ms;
+                rs << pointers.particle_position[s][0], pointers.particle_position[s][1],
+                    pointers.particle_position[s][2];
+                ms << pointers.particle_mag_moment[s][0], pointers.particle_mag_moment[s][1],
+                    pointers.particle_mag_moment[s][2];
+                dist = (rt - rs).norm();
+                if (dist < 4.0 * h) {
+                    q = dist / h;
+                    get_R(R, rt, rs); // note rs is the source!
+                    m_hat = R.transpose() * ms;
+                    get_T_hat(T_hat, m_hat, q);
+                    Ts = R * T_hat * R.transpose(); // * 10000000.0;
+                    // std::cout << Ts << std::endl;
+                } else {
+                    get_Force_Tensor(Ts, rt, rs, ms);
+                    // Ts *= 0.1;
+                    Ts *= mu0;
+                }
+                U += Ts;
             }
-            U += Ts;
+            ft = U * mt;
+        } else {
+            ft.setZero();
         }
-        ft = U * mt;
         dvec3 F = dvec3(ft[0], ft[1], ft[2]);
         F += glm::dmat3(dHext(dvec3(pointers.particle_position[t]) - dipole)) * dvec3(mt[0], mt[1], mt[2]) * mu0;
         pointers.particle_mag_force[t] = vec3(F);

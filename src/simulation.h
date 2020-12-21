@@ -105,11 +105,13 @@ class Simulation {
     float gamma = 7;
     float kappa = 1.0;
     float alpha = 1.0;
-    float dt = 0.001;
+    float dt = 0.0001;
     int size = 0;
     float mass = 0.0;
+    bool enable_ferro = false;
     bool enable_gravity = true;
-    bool enable_interparticle_magnetization = false;
+    bool enable_interparticle_force = true;
+    bool enable_interparticle_magnetization = false; // implemented as is in paper, but result is bad
     float h = 2 * radius;       // kernel size
     float susceptibility = 0.8; // material susceptibility
     float Gamma = pow(radius, 3) * (susceptibility / (1 + susceptibility));

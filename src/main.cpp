@@ -8,15 +8,39 @@
 #include <iostream>
 #include <random>
 #include <sstream>
-int main() {
+double reconstruction_iso = 0.5;
+Eigen::Vector3i reconstruction_res(200, 200, 200);
+void setup_ferror_success(Simulation &sim) {
+    sim.enable_ferro = true;
+    sim.enable_gravity = false;
+    sim.enable_interparticle_magnetization = false;
+    sim.enable_interparticle_force = true;
+    sim.dt = 0.0005;
+    {
+        sim.lower.x = 0.3;
+        sim.lower.z = 0.3;
+        sim.upper.x = 0.7;
+        sim.upper.z = 0.7;
+    }
+    reconstruction_iso = 0.5;
+    reconstruction_res = Eigen::Vector3i(150, 80, 150);
+}
+
+bool write_obj_sequence = false;
+int main(int argc, char **argv) {
+    if (argc > 1) {
+        if (std::strcmp(argv[1], "-s") == 0) {
+            write_obj_sequence = true;
+        }
+    }
     std::vector<vec3> particles;
     std::condition_variable cv;
     std::atomic_bool run_sim = true;
     {
         std::random_device rd;
         std::uniform_real_distribution<float> dist;
-        for (float x = 0.4; x < 0.6; x += 0.014) {
-            for (float z = 0.4; z < 0.6; z += 0.014) {
+        for (float x = 0.3; x < 0.7; x += 0.02) {
+            for (float z = 0.3; z < 0.7; z += 0.02) {
                 for (float y = 0.0; y < 0.1; y += 0.01) {
                     particles.emplace_back(x, y, z);
                 }
@@ -34,12 +58,8 @@ int main() {
         // }
     }
     Simulation sim(particles);
-    {
-        sim.lower.x = 0.4;
-        sim.lower.z = 0.4;
-        sim.upper.x = 0.6;
-        sim.upper.z = 0.6;
-    }
+    setup_ferror_success(sim);
+
     Eigen::MatrixXd PP;
     Eigen::MatrixXi PI;
     sim.visualize_field(PP, PI);
@@ -48,6 +68,46 @@ int main() {
     P.resize(0, 3);
     std::mutex m;
     std::mutex sim_lk;
+
+    auto write_obj = [&] {
+        Eigen::VectorXd mass, density;
+        {
+            std::lock_guard<std::mutex> lk(sim_lk);
+            mass.resize(sim.num_particles);
+            density.resize(sim.num_particles);
+            mass.setConstant(sim.mass);
+            for (size_t i = 0; i < sim.num_particles; i++) {
+                density[i] = sim.pointers.density[i];
+            }
+        }
+        Eigen::MatrixXd V;
+        Eigen::MatrixXi F;
+        reconstruct(V, F, P, reconstruction_res, mass, density, sim.h, reconstruction_iso);
+        std::time_t result = std::time(nullptr);
+        std::ostringstream os;
+        os << "sim-" << result << ".obj";
+        igl::writeOBJ(os.str(), V, F);
+    };
+    auto write_obj_seq = [&](size_t iter) {
+        Eigen::VectorXd mass, density;
+        {
+            std::lock_guard<std::mutex> lk(sim_lk);
+            mass.resize(sim.num_particles);
+            density.resize(sim.num_particles);
+            mass.setConstant(sim.mass);
+            for (size_t i = 0; i < sim.num_particles; i++) {
+                density[i] = sim.pointers.density[i];
+            }
+        }
+        Eigen::MatrixXd V;
+        Eigen::MatrixXi F;
+        reconstruct(V, F, P, reconstruction_res, mass, density, sim.h, reconstruction_iso);
+        printf("============== WRITE OBJ SEQUENCE =================\n");
+        std::ostringstream os;
+        std::time_t result = std::time(nullptr);
+        os << "sim-" << result << "-iter-" << sim.n_iter << ".obj";
+        igl::writeOBJ(os.str(), V, F);
+    };
     std::thread sim_thd([&] {
         std::unique_lock<std::mutex> lk(m, std::defer_lock);
         while (flag) {
@@ -67,31 +127,16 @@ int main() {
                 }
                 lk.unlock();
                 cv.notify_one();
+                if (write_obj_sequence && sim.n_iter % 100 == 0) {
+                    write_obj_seq(sim.n_iter);
+                }
             }
         }
     });
-    auto write_obj = [&] {
-        Eigen::VectorXd mass, density;
-        {
-            std::lock_guard<std::mutex> lk(sim_lk);
-            mass.resize(sim.num_particles);
-            density.resize(sim.num_particles);
-            mass.setConstant(sim.mass);
-            for (size_t i = 0; i < sim.num_particles; i++) {
-                density[i] = sim.pointers.density[i];
-            }
-        }
-        Eigen::MatrixXd V;
-        Eigen::MatrixXi F;
-        reconstruct(V, F, P, Eigen::Vector3i(200, 200, 200), mass, density, sim.h, 0.1);
-        std::time_t result = std::time(nullptr);
-        std::ostringstream os;
-        os << "sim-" << result << ".obj";
-        igl::writeOBJ(os.str(), V, F);
-    };
+
     using Viewer = igl::opengl::glfw::Viewer;
     igl::opengl::glfw::Viewer viewer;
-    viewer.data().set_edges(PP, PI, Eigen::RowVector3d(1, 0.47, 0.45));
+    // viewer.data().set_edges(PP, PI, Eigen::RowVector3d(1, 0.47, 0.45));
     viewer.callback_post_draw = [&](Viewer &) -> bool {
         std::unique_lock<std::mutex> lk(m);
         if (std::cv_status::no_timeout == cv.wait_for(lk, std::chrono::milliseconds(16))) {

@@ -24,8 +24,10 @@ void reconstruct(Eigen::MatrixXd &V, Eigen::MatrixXi &F, const Eigen::MatrixXd &
 
     printf("P.rows() = %d\n", P.rows());
     using igl::copyleft::marching_cubes;
-    Eigen::Vector3d lower = Eigen::Vector3d::Zero() - Eigen::Vector3d::Constant(2 * h); // = P.colwise().minCoeff();
-    Eigen::Vector3d upper = Eigen::Vector3d::Ones() + Eigen::Vector3d::Constant(2 * h); // P.colwise().maxCoeff();
+    // Eigen::Vector3d lower = Eigen::Vector3d::Zero() - Eigen::Vector3d::Constant(2 * h); // = P.colwise().minCoeff();
+    // Eigen::Vector3d upper = Eigen::Vector3d::Ones() + Eigen::Vector3d::Constant(2 * h); // P.colwise().maxCoeff();
+    Eigen::Vector3d lower = Eigen::Vector3d(P.colwise().minCoeff()) - Eigen::Vector3d::Constant(2 * h);
+    Eigen::Vector3d upper = Eigen::Vector3d(P.colwise().maxCoeff()) + Eigen::Vector3d::Constant(2 * h);
     Eigen::Vector3d extent = upper - lower;
     Eigen::VectorXd S;
     Eigen::MatrixXd GV;
@@ -33,7 +35,7 @@ void reconstruct(Eigen::MatrixXd &V, Eigen::MatrixXi &F, const Eigen::MatrixXd &
     GV.resize(res.prod(), 3);
     Eigen::Vector3d nn_cell_size(2 * h, 2 * h, 2 * h);
     Eigen::Vector3i nn_grid_size;
-    nn_grid_size << 1.0 / nn_cell_size[0], 1.0 / nn_cell_size[1], 1.0 / nn_cell_size[2];
+    nn_grid_size << extent[0] / nn_cell_size[0], extent[1] / nn_cell_size[1], extent[2] / nn_cell_size[2];
     Eigen::Vector3d grid_cell_size = extent.array() / (res - Eigen::Vector3i::Ones()).cast<double>().array();
     for (int i = 0; i < res.prod(); i++) {
         int x = i % res[0];
