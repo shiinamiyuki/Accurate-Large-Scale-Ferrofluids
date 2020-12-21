@@ -106,9 +106,9 @@ Simulation setup_sph_fluid_crown() {
     {
         std::random_device rd;
         std::uniform_real_distribution<float> dist;
-        for (float x = 0.0; x < 0.99; x += 0.02) {
-            for (float z = 0.0; z < 0.99; z += 0.02) {
-                for (float y = 0.0; y < 0.15; y += 0.02) {
+        for (float x = 0.3; x < 0.7; x += 0.02) {
+            for (float z = 0.3; z < 0.7; z += 0.02) {
+                for (float y = 0.0; y < 0.2; y += 0.01) {
                     particles.emplace_back(x, y, z);
                 }
             }
@@ -128,7 +128,13 @@ Simulation setup_sph_fluid_crown() {
     sim.enable_gravity = true;
     sim.enable_interparticle_magnetization = false;
     sim.enable_interparticle_force = false;
-    sim.dt = 0.001;
+    sim.dt = 0.0002;
+    {
+        sim.lower.x = 0.3;
+        sim.lower.z = 0.3;
+        sim.upper.x = 0.7;
+        sim.upper.z = 0.7;
+    }
     sim.alpha = 0.4;
     sim.tension = 1000.0;
     reconstruction_iso = 0.5;
@@ -241,7 +247,7 @@ int main(int argc, char **argv) {
                     sim.run_step();
                     sim_ready = true;
                 }
-                if (write_obj_sequence && sim.n_iter % 100 == 0) {
+                if (write_obj_sequence && sim.n_iter % 1000 == 0) {
                     write_obj_seq(sim.n_iter);
                 }
             }
