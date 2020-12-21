@@ -172,8 +172,8 @@ int main(int argc, char **argv) {
     std::atomic_bool run_sim = true;
     std::atomic_bool sim_ready = false;
 
-    // auto sim = setup_ferror_success();
-    auto sim = setup_sph_wave_impact();
+    auto sim = setup_ferror_success();
+    // auto sim = setup_sph_wave_impact();
     // setup_ferror_no_interparticle(sim);
 
     Eigen::MatrixXd PP;

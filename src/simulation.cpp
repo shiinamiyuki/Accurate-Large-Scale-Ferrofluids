@@ -294,7 +294,7 @@ float Simulation::W_avr(vec3 r) {
     if (0 <= q && q < 1) {
         W_r_h = (1.0 / 40.0) * (15.0 * q3 - 36 * q2 + 40.0);
     } else if (1 <= q && q < 2) {
-        W_r_h = (-3.0 / (4.0 * q3)) * (q6 / 6.0 - (6.0 * q5) / 5.0 + 3.0 * pow(q, 4) - (8.0 * q3) / 3.0 + 1.0 / 15.0);
+        W_r_h = (-3.0 / (4.0 * q3)) * (q6 / 6.0 - (6.0 * q5) / 5.0 + 3.0 * q4 - (8.0 * q3) / 3.0 + 1.0 / 15.0);
     } else {
         W_r_h = 3.0 / (4.0 * q3);
     }
@@ -308,11 +308,16 @@ float Simulation::W(vec3 r) {
     float r_norm = length(r);
     float W_r_h = 0.0;
     float q = r_norm / h;
+    auto q2 = (2.0 - q);
+    auto q2_3 = q2 * q2 * q2;
     if (0 <= q && q < 1) {
-        W_r_h = 0.25 * pow((2.0 - q), 3) - pow((1.0 - q), 3);
+
+        auto q1 = (1.0 - q);
+        auto q1_3 = q1 * q1 * q1;
+        W_r_h = 0.25 * q2_3 - q1_3;
     }
     if (1 <= q && q < 2) {
-        W_r_h = 0.25 * pow((2.0 - q), 3);
+        W_r_h = 0.25 * q2_3;
     }
     W_r_h *= (1.0 / pi);
     W_r_h *= (1.0 / (h * h * h));

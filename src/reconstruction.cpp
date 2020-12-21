@@ -10,14 +10,14 @@
 void reconstruct(Eigen::MatrixXd &V, Eigen::MatrixXi &F, const Eigen::MatrixXd &P, const Eigen::Vector3i &res,
                  const Eigen::VectorXd &mass, const Eigen::VectorXd &density, double h, double isovalue) {
     auto W_k = 10. / (7. * igl::PI);
-    auto kernel_P = [&](double r) {
+    auto P1 = [&](double r) {
         auto q = r;
         auto res = 0.0;
         if (q <= 1.0)
             res = (1 - 1.5 * q * q + 0.75 * q * q * q);
         else if (q < 2.0) {
-            auto two_m_q = 2 - q;
-            res = 0.25 * two_m_q * two_m_q * two_m_q;
+            auto q2 = 2 - q;
+            res = 0.25 * q2 * q2 * q2;
         }
         return res;
     };
@@ -225,7 +225,7 @@ void reconstruct(Eigen::MatrixXd &V, Eigen::MatrixXi &F, const Eigen::MatrixXd &
         for (auto j : neighbors[i]) {
             Eigen::Vector3d xj = X.row(j);
             Eigen::Vector3d r = x - xj;
-            auto W = W_k / (h * h) * G[j].norm() * kernel_P((G[j] * r).norm());
+            auto W = W_k / (h * h) * G[j].norm() * P1((G[j] * r).norm());
             // std::cout << (G[j] * r).norm() << std::endl;
             // std::cout << (r.norm() / h) << std::endl;
             s += mass[j] / density[j] * W;
@@ -236,7 +236,7 @@ void reconstruct(Eigen::MatrixXd &V, Eigen::MatrixXi &F, const Eigen::MatrixXd &
         // for (auto j : neighbors[i]) {
         //     Eigen::Vector3d xj = P.row(j);
         //     Eigen::Vector3d r = x - xj;
-        //     auto W = W_k / (h * h * h) * kernel_P(r.norm() / h);
+        //     auto W = W_k / (h * h * h) * P1(r.norm() / h);
         //     s += mass[j] / density[j] * W;
         // }
 
