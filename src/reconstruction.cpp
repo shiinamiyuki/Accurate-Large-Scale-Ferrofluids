@@ -199,7 +199,7 @@ void reconstruct(Eigen::MatrixXd &V, Eigen::MatrixXi &F, const Eigen::MatrixXd &
                         (cell_idx.array() < nn_grid_size.array()).all()) {
                         auto &cell = grid[get_nn_linear_index(cell_idx)];
                         for (auto &j : cell.particles) {
-                            Eigen::Vector3d q = P.row(j);
+                            Eigen::Vector3d q = X.row(j);
                             if ((p - q).norm() < 2 * h) {
                                 neighbors[i].push_back(j);
                             }

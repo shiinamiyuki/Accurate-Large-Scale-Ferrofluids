@@ -10,7 +10,7 @@
 #include <sstream>
 double reconstruction_iso = 0.5;
 Eigen::Vector3i reconstruction_res(200, 200, 200);
-Simulation setup_ferror_success() {
+Simulation setup_ferro_success() {
     std::vector<vec3> particles;
     {
         std::random_device rd;
@@ -40,7 +40,7 @@ Simulation setup_ferror_success() {
     reconstruction_res = Eigen::Vector3i(150, 80, 150);
     return sim;
 }
-Simulation setup_ferror_with_gravity_success() { // gravity makes it more stable but makes spikes shorter
+Simulation setup_ferro_with_gravity_success() { // gravity makes it more stable but makes spikes shorter
     std::vector<vec3> particles;
     {
         std::random_device rd;
@@ -59,6 +59,7 @@ Simulation setup_ferror_with_gravity_success() { // gravity makes it more stable
     sim.enable_gravity = true;
     sim.enable_interparticle_magnetization = false;
     sim.enable_interparticle_force = true;
+    // sim.alpha = 10.0;
     sim.dt = 0.0005;
     {
         sim.lower.x = 0.3;
@@ -70,7 +71,7 @@ Simulation setup_ferror_with_gravity_success() { // gravity makes it more stable
     reconstruction_res = Eigen::Vector3i(150, 80, 150);
     return sim;
 }
-Simulation setup_ferror_no_interparticle() {
+Simulation setup_ferro_no_interparticle() {
     std::vector<vec3> particles;
     {
         std::random_device rd;
@@ -84,12 +85,12 @@ Simulation setup_ferror_no_interparticle() {
         }
     }
     Simulation sim(particles);
-
+    sim.alpha = 4.0; // sim.alpha = 1 makes the fluid really funny
     sim.enable_ferro = true;
     sim.enable_gravity = false;
     sim.enable_interparticle_magnetization = false;
     sim.enable_interparticle_force = false;
-    sim.dt = 0.0005;
+    sim.dt = 0.0001;
     {
         sim.lower.x = 0.3;
         sim.lower.z = 0.3;
@@ -172,9 +173,10 @@ int main(int argc, char **argv) {
     std::atomic_bool run_sim = true;
     std::atomic_bool sim_ready = false;
 
-    auto sim = setup_ferror_success();
+    // auto sim = setup_ferro_success();
+    // auto sim = setup_ferro_with_gravity_success();
     // auto sim = setup_sph_wave_impact();
-    // setup_ferror_no_interparticle(sim);
+    auto sim = setup_ferro_no_interparticle();
 
     Eigen::MatrixXd PP;
     Eigen::MatrixXi PI;
