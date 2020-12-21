@@ -108,12 +108,13 @@ class Simulation {
     float dt = 0.0001;
     int size = 0;
     float mass = 0.0;
+    float tension = 1000.0f;
     bool enable_ferro = false;
     bool enable_gravity = true;
     bool enable_interparticle_force = true;
     bool enable_interparticle_magnetization = false; // implemented as is in paper, but result is bad
-    float h = 2 * radius;       // kernel size
-    float susceptibility = 0.8; // material susceptibility
+    float h = 2 * radius;                            // kernel size
+    float susceptibility = 0.8;                      // material susceptibility
     float Gamma = pow(radius, 3) * (susceptibility / (1 + susceptibility));
     ivec3 grid_size;
     dvec3 dipole = dvec3(0.5, -0.6, 0.5);
@@ -167,6 +168,14 @@ class Simulation {
         init();
         for (size_t i = 0; i < num_particles; i++) {
             pointers.particle_position[i] = particles[i];
+        }
+    }
+    Simulation(const std::vector<vec3> &particles, const std::vector<vec3> &velocity)
+        : size(size), num_particles(particles.size()) {
+        init();
+        for (size_t i = 0; i < num_particles; i++) {
+            pointers.particle_position[i] = particles[i];
+            pointers.particle_velocity[i] = velocity[i];
         }
     }
     void run_step();

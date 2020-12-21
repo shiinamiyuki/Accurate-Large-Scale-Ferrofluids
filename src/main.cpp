@@ -10,7 +10,21 @@
 #include <sstream>
 double reconstruction_iso = 0.5;
 Eigen::Vector3i reconstruction_res(200, 200, 200);
-void setup_ferror_success(Simulation &sim) {
+Simulation setup_ferror_success() {
+    std::vector<vec3> particles;
+    {
+        std::random_device rd;
+        std::uniform_real_distribution<float> dist;
+        for (float x = 0.3; x < 0.7; x += 0.02) {
+            for (float z = 0.3; z < 0.7; z += 0.02) {
+                for (float y = 0.0; y < 0.1; y += 0.01) {
+                    particles.emplace_back(x, y, z);
+                }
+            }
+        }
+    }
+    Simulation sim(particles);
+
     sim.enable_ferro = true;
     sim.enable_gravity = false;
     sim.enable_interparticle_magnetization = false;
@@ -24,18 +38,10 @@ void setup_ferror_success(Simulation &sim) {
     }
     reconstruction_iso = 0.5;
     reconstruction_res = Eigen::Vector3i(150, 80, 150);
+    return sim;
 }
-
-bool write_obj_sequence = false;
-int main(int argc, char **argv) {
-    if (argc > 1) {
-        if (std::strcmp(argv[1], "-s") == 0) {
-            write_obj_sequence = true;
-        }
-    }
+Simulation setup_ferror_with_gravity_success() { // gravity makes it more stable but makes spikes shorter
     std::vector<vec3> particles;
-    std::condition_variable cv;
-    std::atomic_bool run_sim = true;
     {
         std::random_device rd;
         std::uniform_real_distribution<float> dist;
@@ -46,19 +52,129 @@ int main(int argc, char **argv) {
                 }
             }
         }
-        // for (float x = 0.4; x < 0.6; x += 0.02) {
-        //     for (float z = 0.4; z < 0.6; z += 0.02) {
-        //         for (float y = 0.5; y < 0.6; y += 0.02) {
-        //             particles.emplace_back(x, y, z);
-        //         }
-        //     }
-        // }
-        // for(int i= 0;i < 4000;i++){
-        //     particles.emplace_back(dist(rd), dist(rd), dist(rd));
-        // }
     }
     Simulation sim(particles);
-    setup_ferror_success(sim);
+
+    sim.enable_ferro = true;
+    sim.enable_gravity = true;
+    sim.enable_interparticle_magnetization = false;
+    sim.enable_interparticle_force = true;
+    sim.dt = 0.0005;
+    {
+        sim.lower.x = 0.3;
+        sim.lower.z = 0.3;
+        sim.upper.x = 0.7;
+        sim.upper.z = 0.7;
+    }
+    reconstruction_iso = 0.5;
+    reconstruction_res = Eigen::Vector3i(150, 80, 150);
+    return sim;
+}
+Simulation setup_ferror_no_interparticle() {
+    std::vector<vec3> particles;
+    {
+        std::random_device rd;
+        std::uniform_real_distribution<float> dist;
+        for (float x = 0.3; x < 0.7; x += 0.02) {
+            for (float z = 0.3; z < 0.7; z += 0.02) {
+                for (float y = 0.0; y < 0.1; y += 0.01) {
+                    particles.emplace_back(x, y, z);
+                }
+            }
+        }
+    }
+    Simulation sim(particles);
+
+    sim.enable_ferro = true;
+    sim.enable_gravity = false;
+    sim.enable_interparticle_magnetization = false;
+    sim.enable_interparticle_force = false;
+    sim.dt = 0.0005;
+    {
+        sim.lower.x = 0.3;
+        sim.lower.z = 0.3;
+        sim.upper.x = 0.7;
+        sim.upper.z = 0.7;
+    }
+    reconstruction_iso = 0.5;
+    reconstruction_res = Eigen::Vector3i(150, 80, 150);
+    return sim;
+}
+Simulation setup_sph_fluid_crown() {
+    std::vector<vec3> particles;
+    {
+        std::random_device rd;
+        std::uniform_real_distribution<float> dist;
+        for (float x = 0.0; x < 0.99; x += 0.02) {
+            for (float z = 0.0; z < 0.99; z += 0.02) {
+                for (float y = 0.0; y < 0.15; y += 0.02) {
+                    particles.emplace_back(x, y, z);
+                }
+            }
+        }
+        for (float x = 0.4; x < 0.6; x += 0.02) {
+            for (float z = 0.4; z < 0.6; z += 0.02) {
+                for (float y = 0.7; y < 0.8; y += 0.02) {
+                    particles.emplace_back(x, y, z);
+                }
+            }
+        }
+    }
+    Simulation sim(particles);
+    sim.enable_ferro = false;
+    sim.enable_gravity = true;
+    sim.enable_interparticle_magnetization = false;
+    sim.enable_interparticle_force = false;
+    sim.dt = 0.001;
+    sim.alpha = 0.04;
+    reconstruction_iso = 0.5;
+    reconstruction_res = Eigen::Vector3i(150, 80, 150);
+    return sim;
+}
+Simulation setup_sph_wave_impact() {
+    std::vector<vec3> particles;
+    std::vector<vec3> velocity;
+    {
+        std::random_device rd;
+        std::uniform_real_distribution<float> dist;
+        for (float x = 0.0; x < 0.99; x += 0.02) {
+            for (float z = 0.0; z < 0.99; z += 0.02) {
+                for (float y = 0.0; y < 0.15; y += 0.02) {
+                    particles.emplace_back(x, y, z);
+                    vec3 p = vec3(x, y, z);
+                    vec3 v = (vec3(0.5, y, 0.5) - p);
+                    velocity.emplace_back(v);
+                }
+            }
+        }
+    }
+    Simulation sim(particles, velocity);
+    sim.enable_ferro = false;
+    sim.enable_gravity = true;
+    sim.enable_interparticle_magnetization = false;
+    sim.enable_interparticle_force = false;
+    sim.dt = 0.0003;
+    sim.alpha = 0.04;
+    sim.tension = 100;
+    sim.c0 = 30;
+    reconstruction_iso = 0.3;
+    reconstruction_res = Eigen::Vector3i(150, 150, 150);
+    return sim;
+}
+bool write_obj_sequence = false;
+int main(int argc, char **argv) {
+    if (argc > 1) {
+        if (std::strcmp(argv[1], "-s") == 0) {
+            write_obj_sequence = true;
+        }
+    }
+
+    std::condition_variable cv;
+    std::atomic_bool run_sim = true;
+
+    // auto sim = setup_ferror_success();
+    auto sim = setup_sph_wave_impact();
+    // setup_ferror_no_interparticle(sim);
 
     Eigen::MatrixXd PP;
     Eigen::MatrixXi PI;

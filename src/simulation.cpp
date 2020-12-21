@@ -170,7 +170,7 @@ vec3 Simulation::dvdt_tension_term(size_t id) {
         auto vab = va - vb;
         auto rab = ra - rb;
         if (length(rab) <= k * h) {
-            f += 1000.0f * mass * mass * float(std::cos(3 * pi / (2 * k * h) * length(rab))) * rab;
+            f += tension * mass * mass * float(std::cos(3 * pi / (2 * k * h) * length(rab))) * rab;
         }
     }
     CHECK(!glm::any(glm::isnan(f)));
@@ -716,8 +716,6 @@ void Simulation::magnetization() {
 }
 
 void Simulation::compute_magenetic_force() {
-    if (!enable_ferro)
-        return;
     eval_Hext();
     Eigen::VectorXd hext(3 * num_particles), b;
     for (size_t i = 0; i < num_particles; i++) {
@@ -876,7 +874,8 @@ void Simulation::compute_magenetic_force() {
 void Simulation::run_step_adami() {
     if (n_iter == 0) {
         tbb::parallel_for(size_t(0), num_particles, [=](size_t id) { pointers.particle_mag_force[id] = vec3(0); });
-        compute_magenetic_force();
+        if (enable_ferro)
+            compute_magenetic_force();
     }
     build_grid();
     find_neighbors();
@@ -899,8 +898,12 @@ void Simulation::run_step_adami() {
             dt * 0.5f * pointers.particle_velocity[id]; // r(t+dt) = r(t+dt/2) + dt/2 * v(t+dt/2)
     });
     if (n_iter % 10 == 0) {
-        printf("compute magnetic force; iter=%zu\n", n_iter);
-        compute_magenetic_force();
+        if (enable_ferro) {
+            printf("compute magnetic force; iter=%zu\n", n_iter);
+            compute_magenetic_force();
+        } else {
+            printf("iter=%zu\n", n_iter);
+        }
     }
     tbb::parallel_for(size_t(0), num_particles, [=](size_t id) {
         vec3 dvdt = dvdt_full(id);
