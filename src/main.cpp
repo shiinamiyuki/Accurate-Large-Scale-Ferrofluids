@@ -29,14 +29,14 @@ Simulation setup_ferro_success() {
     sim.enable_gravity = false;
     sim.enable_interparticle_magnetization = false;
     sim.enable_interparticle_force = true;
-    sim.dt = 0.0005;
+    sim.dt = 0.0004;
     {
         sim.lower.x = 0.3;
         sim.lower.z = 0.3;
         sim.upper.x = 0.7;
         sim.upper.z = 0.7;
     }
-    reconstruction_iso = 0.5;
+    reconstruction_iso = 3.2;
     reconstruction_res = Eigen::Vector3i(150, 80, 150);
     return sim;
 }
@@ -167,7 +167,7 @@ Simulation setup_sph_fluid_crown() {
     }
     sim.alpha = 0.4;
     sim.tension = 1000.0;
-    reconstruction_iso = 0.5;
+    reconstruction_iso = 4.0;
     reconstruction_res = Eigen::Vector3i(150, 80, 150);
     return sim;
 }
