@@ -8,6 +8,9 @@ An implementation of "On the Accurate Large-scale Simulation of Ferrofluids"
 ## Build & Run
 We have tested on Ubuntu 20.04 with gcc9.3 and Windows 10 with Visual Studio 2019
 
+We use vcpkg because building TBB on Windows is nightmare. :(
+
+It takes a long time due to vcpkg always build both debug and release version of dependencies.
 ```
 # make sure you install these packages
 # sudo apt install libxinerama-dev libxcursor-dev xorg-dev libglu1-mesa-dev
