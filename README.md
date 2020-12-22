@@ -3,7 +3,7 @@
 
 An implementation of "On the Accurate Large-scale Simulation of Ferrofluids"
 
-<em>Disclaimer: This repo is the final project for CSC417 Physics Basd Animation provided by University of Toronto and the results do not reflect the result of the actual paper. This implemention may contain mistakes so please read it at your discretion</em>
+<em>Disclaimer: This repo is the final project for CSC417 Physics Basd Animation provided by University of Toronto and the results do not reflect the result of the actual paper. This implemention may contain mistakes so please read it at your own discretion</em>
 
 ## Build & Run
 We have tested on Ubuntu 20.04 with gcc9.3 and Windows 10 with Visual Studio 2019
