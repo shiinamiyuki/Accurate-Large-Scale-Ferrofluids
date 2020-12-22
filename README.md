@@ -7,10 +7,14 @@ An implementation of "On the Accurate Large-scale Simulation of Ferrofluids"
 
 ## Build & Run
 We have tested on Ubuntu 20.04 with gcc9.3 and Windows 10 with Visual Studio 2019
+
 ```
+# make sure you install these packages
+# sudo apt install libxinerama-dev libxcursor-dev xorg-dev libglu1-mesa-dev
 git clone --recursive https://github.com/shiinamiyuki/Accurate-Large-Scale-Ferrofluids
 mkdir build && cd bulid
 cmake .. -DCMAKE_BUILT_TYPE=Release
+# if the previous one failed, try this: cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_MAKE_PROGRAM=make
 make -j 8
 ./sim
 ```
