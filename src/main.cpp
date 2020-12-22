@@ -213,8 +213,8 @@ int main(int argc, char **argv) {
         }
     }
 
-    std::atomic_bool run_sim = true;
-    std::atomic_bool sim_ready = false;
+    std::atomic_bool run_sim(true);
+    std::atomic_bool sim_ready(false);
 
     auto sim = setup_ferro_success();
     // auto sim = setup_ferro_with_gravity_success();
