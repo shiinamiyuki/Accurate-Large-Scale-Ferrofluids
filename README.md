@@ -3,12 +3,23 @@
 
 An implementation of "On the Accurate Large-scale Simulation of Ferrofluids"
 
-<em>Disclaimer: This repo is the final project for CSC417 Physics Basd Animation provided by University of Toronto and the results do not reflect the result of the actual paper. This implemention may contain mistakes so please read it at your discretion</em>
+<em>Disclaimer: This repo is the final project for CSC417 Physics Basd Animation provided by University of Toronto and the results do not reflect the result of the actual paper. This implemention may contain mistakes so please read it at your own discretion</em>
+
+Video link: https://youtu.be/YdTgiwXO43E
 
 ## Build & Run
+We have tested on Ubuntu 20.04 with gcc9.3 and Windows 10 with Visual Studio 2019
+
+We use vcpkg because building TBB on Windows is nightmare. :(
+
+It takes a long time due to vcpkg always build both debug and release version of dependencies.
 ```
+# make sure you install these packages
+# sudo apt install libxinerama-dev libxcursor-dev xorg-dev libglu1-mesa-dev
+git clone --recursive https://github.com/shiinamiyuki/Accurate-Large-Scale-Ferrofluids
 mkdir build && cd bulid
 cmake .. -DCMAKE_BUILT_TYPE=Release
+# if the previous one failed, try this: cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_MAKE_PROGRAM=make
 make -j 8
 ./sim
 ```
