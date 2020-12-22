@@ -7,6 +7,10 @@
 #include <igl/writeOBJ.h>
 #include <iostream>
 #include <random>
+#include <thread>
+#include <atomic>
+#include <mutex>
+#include <condition_variable>
 #include <sstream>
 double reconstruction_iso = 0.5;
 Eigen::Vector3i reconstruction_res(200, 200, 200);
@@ -212,12 +216,12 @@ int main(int argc, char **argv) {
     std::atomic_bool run_sim = true;
     std::atomic_bool sim_ready = false;
 
-    // auto sim = setup_ferro_success();
+    auto sim = setup_ferro_success();
     // auto sim = setup_ferro_with_gravity_success();
     // auto sim = setup_sph_wave_impact();
     // auto sim = setup_sph_fluid_crown();
     // auto sim = setup_ferro_no_interparticle();
-    auto sim = setup_ferro_no_magnetic();
+    // auto sim = setup_ferro_no_magnetic();
 
     Eigen::MatrixXd PP;
     Eigen::MatrixXi PI;
