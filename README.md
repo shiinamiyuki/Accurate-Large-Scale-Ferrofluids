@@ -7,7 +7,7 @@ An implementation of "On the Accurate Large-scale Simulation of Ferrofluids"
 
 ## Build & Run
 We have tested on Ubuntu 20.04 with gcc9.3 and Windows 10 with Visual Studio 2019
-
+It takes around 10 minutes to build.
 ```
 # make sure you install these packages
 # sudo apt install libxinerama-dev libxcursor-dev xorg-dev libglu1-mesa-dev
