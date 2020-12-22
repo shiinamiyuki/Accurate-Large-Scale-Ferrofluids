@@ -17,7 +17,7 @@ It takes a long time due to vcpkg always build both debug and release version of
 (For CSC417 TAs: a build might take around 4-5 GB of disk usage, this might exceed your disk quota if you are building on lab machines)
 ```
 # make sure you install these packages
-# sudo apt install libxinerama-dev libxcursor-dev xorg-dev libglu1-mesa-dev pkg-config
+# sudo apt install libxinerama-dev libxcursor-dev xorg-dev libglu1-mesa-dev pkg-config tar curl zip unzip
 git clone --recursive https://github.com/shiinamiyuki/Accurate-Large-Scale-Ferrofluids
 mkdir build && cd bulid
 cmake .. -DCMAKE_BUILT_TYPE=Release
