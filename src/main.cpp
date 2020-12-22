@@ -29,14 +29,14 @@ Simulation setup_ferro_success() {
     sim.enable_gravity = false;
     sim.enable_interparticle_magnetization = false;
     sim.enable_interparticle_force = true;
-    sim.dt = 0.0005;
+    sim.dt = 0.0004;
     {
         sim.lower.x = 0.3;
         sim.lower.z = 0.3;
         sim.upper.x = 0.7;
         sim.upper.z = 0.7;
     }
-    reconstruction_iso = 0.5;
+    reconstruction_iso = 3.2;
     reconstruction_res = Eigen::Vector3i(150, 80, 150);
     return sim;
 }
@@ -137,7 +137,7 @@ Simulation setup_sph_fluid_crown() {
     }
     sim.alpha = 0.4;
     sim.tension = 1000.0;
-    reconstruction_iso = 0.5;
+    reconstruction_iso = 4.0;
     reconstruction_res = Eigen::Vector3i(150, 80, 150);
     return sim;
 }
@@ -182,10 +182,10 @@ int main(int argc, char **argv) {
     std::atomic_bool run_sim = true;
     std::atomic_bool sim_ready = false;
 
-    // auto sim = setup_ferro_success();
+    auto sim = setup_ferro_success();
     // auto sim = setup_ferro_with_gravity_success();
     // auto sim = setup_sph_wave_impact();
-    auto sim = setup_sph_fluid_crown();
+    // auto sim = setup_sph_fluid_crown();
     // auto sim = setup_ferro_no_interparticle();
 
     Eigen::MatrixXd PP;
@@ -246,7 +246,7 @@ int main(int argc, char **argv) {
                     sim.run_step();
                     sim_ready = true;
                 }
-                if (write_obj_sequence && sim.n_iter % 1000 == 0) {
+                if (write_obj_sequence && sim.n_iter % 30 == 0) {
                     write_obj_seq(sim.n_iter);
                 }
             }
