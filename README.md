@@ -7,6 +7,7 @@ An implementation of "On the Accurate Large-scale Simulation of Ferrofluids"
 
 ## Build & Run
 ```
+git clone --recursive https://github.com/shiinamiyuki/Accurate-Large-Scale-Ferrofluids
 mkdir build && cd bulid
 cmake .. -DCMAKE_BUILT_TYPE=Release
 make -j 8
