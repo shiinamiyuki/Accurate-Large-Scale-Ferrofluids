@@ -101,6 +101,36 @@ Simulation setup_ferro_no_interparticle() {
     reconstruction_res = Eigen::Vector3i(150, 80, 150);
     return sim;
 }
+Simulation setup_ferro_no_magnetic() {
+    std::vector<vec3> particles;
+    {
+        std::random_device rd;
+        std::uniform_real_distribution<float> dist;
+        for (float x = 0.3; x < 0.7; x += 0.02) {
+            for (float z = 0.3; z < 0.7; z += 0.02) {
+                for (float y = 0.0; y < 0.1; y += 0.01) {
+                    particles.emplace_back(x, y, z);
+                }
+            }
+        }
+    }
+    Simulation sim(particles);
+    sim.alpha = 4.0; // sim.alpha = 1 makes the fluid really funny
+    sim.enable_ferro = false;
+    sim.enable_gravity = true;
+    sim.enable_interparticle_magnetization = false;
+    sim.enable_interparticle_force = false;
+    sim.dt = 0.0001;
+    {
+        sim.lower.x = 0.3;
+        sim.lower.z = 0.3;
+        sim.upper.x = 0.7;
+        sim.upper.z = 0.7;
+    }
+    reconstruction_iso = 0.5;
+    reconstruction_res = Eigen::Vector3i(150, 80, 150);
+    return sim;
+}
 Simulation setup_sph_fluid_crown() {
     std::vector<vec3> particles;
     {
@@ -182,11 +212,12 @@ int main(int argc, char **argv) {
     std::atomic_bool run_sim = true;
     std::atomic_bool sim_ready = false;
 
-    auto sim = setup_ferro_success();
+    // auto sim = setup_ferro_success();
     // auto sim = setup_ferro_with_gravity_success();
     // auto sim = setup_sph_wave_impact();
     // auto sim = setup_sph_fluid_crown();
     // auto sim = setup_ferro_no_interparticle();
+    auto sim = setup_ferro_no_magnetic();
 
     Eigen::MatrixXd PP;
     Eigen::MatrixXi PI;
@@ -247,7 +278,7 @@ int main(int argc, char **argv) {
                     sim.run_step();
                     sim_ready = true;
                 }
-                if (write_obj_sequence && sim.n_iter % 1000 == 0) {
+                if (write_obj_sequence && sim.n_iter % 100 == 0) {
                     write_obj_seq(sim.n_iter);
                 }
             }
