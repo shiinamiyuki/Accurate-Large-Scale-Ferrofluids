@@ -14,7 +14,7 @@ We use vcpkg because building TBB on Windows is nightmare. :(
 
 It takes a long time due to vcpkg always build both debug and release version of dependencies.
 
-(For CSC417 TAs: a build might take around 4-5 GB of disk usage, this might exceed your disk quota)
+(For CSC417 TAs: a build might take around 4-5 GB of disk usage, this might exceed your disk quota if you are building on lab machines)
 ```
 # make sure you install these packages
 # sudo apt install libxinerama-dev libxcursor-dev xorg-dev libglu1-mesa-dev
