@@ -116,7 +116,7 @@ Simulation setup_sph_fluid_crown() {
         for (float x = 0.4; x < 0.6; x += 0.02) {
             for (float z = 0.4; z < 0.6; z += 0.02) {
                 for (float y = 0.7; y < 0.9; y += 0.02) {
-                    vec3 c(0.5, 0.6, 0.5);
+                    vec3 c(0.5, 0.8, 0.5);
                     if (length(vec3(x, y, z) - vec3(c)) < 0.1)
                         particles.emplace_back(x, y, z);
                 }
@@ -191,6 +191,7 @@ int main(int argc, char **argv) {
     Eigen::MatrixXd PP;
     Eigen::MatrixXi PI;
     sim.visualize_field(PP, PI);
+
     bool flag = true;
     Eigen::MatrixXd P;
     P.resize(0, 3);
@@ -255,7 +256,7 @@ int main(int argc, char **argv) {
 
     using Viewer = igl::opengl::glfw::Viewer;
     igl::opengl::glfw::Viewer viewer;
-    // viewer.data().set_edges(PP, PI, Eigen::RowVector3d(1, 0.47, 0.45));
+    viewer.data().set_edges(PP, PI, Eigen::RowVector3d(1, 0.47, 0.45));
     viewer.callback_post_draw = [&](Viewer &) -> bool {
         if (sim_ready) {
             sim_ready = false;
